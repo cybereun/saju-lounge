@@ -6,8 +6,8 @@ import { getTojeongContent, type TojeongContent } from "../src/tojeong-content.t
 import { solarToLunar } from "../src/manse.ts";
 import type { CalendarType, Gender, PillarKey, SajuInput, SajuResult } from "../src/types.ts";
 
-type View = "home" | "my" | "profile" | "saju" | "daily" | "compatibility" | "zodiac" | "tojeong";
-type ServiceView = Exclude<View, "home" | "my" | "profile">;
+type View = "home" | "my" | "profile" | "history" | "saju" | "daily" | "compatibility" | "zodiac" | "tojeong";
+type ServiceView = Exclude<View, "home" | "my" | "profile" | "history">;
 
 type BirthProfile = {
   year: string;
@@ -74,7 +74,24 @@ type TojeongReading = {
   caution: string;
 };
 
+type FortuneHistoryEntry = {
+  id: string;
+  key: string;
+  service: ServiceView;
+  dateKey: string;
+  title: string;
+  summary: string;
+  score?: number;
+  meta?: string;
+  targetYear?: number;
+  partnerProfile?: BirthProfile;
+  createdAt: string;
+};
+
+type FortuneHistoryDraft = Omit<FortuneHistoryEntry, "id" | "createdAt">;
+
 const PROFILE_STORAGE_KEY = "saju-lounge-profile-v1";
+const HISTORY_STORAGE_KEY = "saju-lounge-history-v1";
 type TopicReading = {
   id: string;
   icon: string;
@@ -135,6 +152,14 @@ const SERVICES: ServiceCard[] = [
     detail: "생년월일",
   },
 ];
+
+const SERVICE_NAMES: Record<ServiceView, string> = {
+  saju: "사주",
+  daily: "오늘의 운세",
+  tojeong: "토정비결",
+  compatibility: "궁합",
+  zodiac: "별자리",
+};
 
 const PILLAR_META: Array<{ key: PillarKey; title: string; subtitle: string }> = [
   { key: "year", title: "년주", subtitle: "뿌리와 배경" },
@@ -218,6 +243,44 @@ function loadStoredProfile(): BirthProfile | null {
 function saveStoredProfile(profile: BirthProfile) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+}
+
+function isBirthProfile(value: unknown): value is BirthProfile {
+  if (!value || typeof value !== "object") return false;
+  const profile = value as Partial<BirthProfile>;
+  return typeof profile.year === "string" && typeof profile.month === "string" && typeof profile.day === "string" && typeof profile.hour === "string" && typeof profile.minute === "string" && typeof profile.timeUnknown === "boolean" && (profile.gender === "남" || profile.gender === "여") && (profile.calendar === "solar" || profile.calendar === "lunar") && typeof profile.leap === "boolean" && typeof profile.applyLocalMeanTime === "boolean";
+}
+
+function isHistoryEntry(value: unknown): value is FortuneHistoryEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Partial<FortuneHistoryEntry>;
+  return typeof entry.id === "string" && typeof entry.key === "string" && typeof entry.service === "string" && entry.service in SERVICE_NAMES && typeof entry.dateKey === "string" && typeof entry.title === "string" && typeof entry.summary === "string" && typeof entry.createdAt === "string" && (entry.partnerProfile === undefined || isBirthProfile(entry.partnerProfile));
+}
+
+function loadStoredHistory(): FortuneHistoryEntry[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(HISTORY_STORAGE_KEY) || "null") as unknown;
+    return Array.isArray(parsed) ? parsed.filter(isHistoryEntry).slice(0, 30) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredHistory(history: FortuneHistoryEntry[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+}
+
+function profileSignature(profile: BirthProfile): string {
+  return [profile.calendar, profile.year, profile.month, profile.day, profile.hour, profile.minute, profile.timeUnknown, profile.gender, profile.leap, profile.applyLocalMeanTime].join("-");
+}
+
+function historyDateLabel(entry: FortuneHistoryEntry): string {
+  const createdAt = new Date(entry.createdAt);
+  if (Number.isNaN(createdAt.getTime())) return "최근 기록";
+  return createdAt.toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
 }
 
 function toInteger(value: string, label: string, min: number, max: number): number {
@@ -888,7 +951,7 @@ function Header(props: { view: View; hasProfile: boolean; installAvailable: bool
   );
 }
 
-function MyHomeView(props: { profile: BirthProfile; result: SajuResult; onSelect: (view: ServiceView) => void; onEdit: () => void }) {
+function MyHomeView(props: { profile: BirthProfile; result: SajuResult; history: FortuneHistoryEntry[]; onSelect: (view: ServiceView) => void; onEdit: () => void; onOpenHistory: () => void; onOpenEntry: (entry: FortuneHistoryEntry) => void }) {
   const dailyReading = buildDailyReading(props.result, todayKstDate());
   const tojeongReading = buildTojeongReading(props.result);
   const strengthLabel = props.result.advanced.dayStrength.strength === "strong" ? "강한 편" : props.result.advanced.dayStrength.strength === "weak" ? "섬세한 편" : "균형형";
@@ -965,7 +1028,50 @@ function MyHomeView(props: { profile: BirthProfile; result: SajuResult; onSelect
         </div>
       </section>
 
+      <section className="section-block history-preview-section">
+        <div className="section-heading">
+          <div><p className="eyebrow">YOUR JOURNAL</p><h2>최근 운세 기록</h2></div>
+          <button className="text-button" type="button" onClick={props.onOpenHistory}>기록장 전체보기 <span aria-hidden="true">→</span></button>
+        </div>
+        {props.history.length > 0 ? (
+          <div className="history-preview-list">
+            {props.history.slice(0, 3).map((entry) => (
+              <button className="history-preview-item" type="button" key={entry.id} onClick={() => props.onOpenEntry(entry)}>
+                <span className={`history-service-dot ${entry.service}`} aria-hidden="true" />
+                <span className="history-preview-copy"><small>{SERVICE_NAMES[entry.service]} · {entry.dateKey}</small><strong>{entry.title}</strong><span>{entry.meta || entry.summary}</span></span>
+                {entry.score !== undefined ? <strong className="history-preview-score">{entry.score}<small>점</small></strong> : <span className="history-preview-arrow" aria-hidden="true">→</span>}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="history-preview-empty"><span aria-hidden="true">✦</span><div><strong>아직 저장된 운세 기록이 없어요.</strong><p>서비스를 하나 이용하면 이곳에 최근 결과가 쌓입니다.</p></div><button className="secondary-button" type="button" onClick={() => props.onSelect("daily")}>오늘 운세 기록하기</button></div>
+        )}
+      </section>
+
       <p className="my-privacy-note"><span aria-hidden="true">✦</span> 프로필은 이 브라우저의 로컬 저장소에만 보관됩니다. 다른 기기나 서버로 전송하지 않습니다.</p>
+    </div>
+  );
+}
+
+function HistoryView(props: { entries: FortuneHistoryEntry[]; onBack: () => void; onOpen: (entry: FortuneHistoryEntry) => void; onClear: () => void; onStart: () => void }) {
+  return (
+    <div className="page-shell history-page">
+      <PageIntro eyebrow="YOUR JOURNAL" title="운세 기록장" description="최근 확인한 흐름을 이 브라우저에만 보관합니다. 마음에 남은 문장을 다시 펼쳐보세요." onBack={props.onBack} />
+      <div className="history-toolbar"><span>{props.entries.length > 0 ? `최근 ${props.entries.length}개 기록` : "아직 기록이 없습니다"}</span>{props.entries.length > 0 ? <button className="text-button history-clear-button" type="button" onClick={props.onClear}>전체 기록 삭제</button> : null}</div>
+      {props.entries.length > 0 ? (
+        <div className="history-list">
+          {props.entries.map((entry) => (
+            <button className="history-entry" type="button" key={entry.id} onClick={() => props.onOpen(entry)}>
+              <span className={`history-service-dot ${entry.service}`} aria-hidden="true" />
+              <span className="history-entry-copy"><span className="history-entry-meta">{SERVICE_NAMES[entry.service]} · {entry.dateKey} · {historyDateLabel(entry)}</span><strong>{entry.title}</strong><span>{entry.summary}</span>{entry.meta ? <small>{entry.meta}</small> : null}</span>
+              <span className="history-entry-trailing">{entry.score !== undefined ? <strong>{entry.score}<small>점</small></strong> : null}<span aria-hidden="true">→</span></span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="history-empty"><span className="history-empty-mark" aria-hidden="true">✦</span><h2>나의 흐름을 기록해보세요</h2><p>오늘의 운세나 토정비결을 확인하면 결과가 이곳에 자동으로 저장됩니다.</p><button className="primary-button" type="button" onClick={props.onStart}>첫 운세 확인하기 <span aria-hidden="true">→</span></button></div>
+      )}
+      <p className="disclaimer">기록은 이 브라우저의 로컬 저장소에만 보관되며, 브라우저 데이터를 삭제하면 함께 사라질 수 있습니다.</p>
     </div>
   );
 }
@@ -1161,11 +1267,23 @@ function SajuResultView(props: { result: SajuResult; profile: BirthProfile; onEd
   );
 }
 
-function SajuScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
+function SajuScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onHistory: (entry: FortuneHistoryDraft) => void; onBack: () => void }) {
   const [profile, setProfile] = useState<BirthProfile>(props.initialProfile ? { ...props.initialProfile } : createEmptyProfile());
   const [result, setResult] = useState<SajuResult | null>(props.initialResult);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(!props.initialResult);
+
+  useEffect(() => {
+    if (!props.initialProfile || !props.initialResult) return;
+    props.onHistory({
+      service: "saju",
+      key: `saju-${profileSignature(props.initialProfile)}`,
+      dateKey: resultDateLabel(props.initialResult),
+      title: "나의 사주 지도",
+      summary: `${props.initialResult.pillars.day} 일주 · ${props.initialResult.advanced.geukguk} · ${leadingElement(props.initialResult)} 기운`,
+      meta: `${props.initialResult.currentAge}세 · 사주 8글자`,
+    });
+  }, [props.initialProfile, props.initialResult]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1175,6 +1293,14 @@ function SajuScreen(props: { initialProfile: BirthProfile | null; initialResult:
       setError("");
       setEditing(false);
       props.onSaved(profile, nextResult);
+      props.onHistory({
+        service: "saju",
+        key: `saju-${profileSignature(profile)}`,
+        dateKey: resultDateLabel(nextResult),
+        title: "나의 사주 지도",
+        summary: `${nextResult.pillars.day} 일주 · ${nextResult.advanced.geukguk} · ${leadingElement(nextResult)} 기운`,
+        meta: `${nextResult.currentAge}세 · 사주 8글자`,
+      });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "입력값을 확인해주세요.");
@@ -1186,14 +1312,36 @@ function SajuScreen(props: { initialProfile: BirthProfile | null; initialResult:
   return <div className="page-shell"><PageIntro eyebrow="CORE READING" title="내 사주 분석" description="태어난 순간의 하늘과 땅이 건네는 나만의 리듬을 살펴봅니다." onBack={props.onBack} /><ProfileForm profile={profile} onChange={(next) => setProfile((current) => ({ ...current, ...next }))} onSubmit={handleSubmit} title="출생 정보를 알려주세요" description="정확한 계산을 위해 양력·음력과 출생 시간을 선택해주세요." submitLabel="사주 분석 시작하기" error={error} idPrefix="saju" /></div>;
 }
 
-function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
+function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; initialDate?: string; onSaved: (profile: BirthProfile, result: SajuResult) => void; onHistory: (entry: FortuneHistoryDraft) => void; onBack: () => void }) {
   const [profile, setProfile] = useState<BirthProfile>(props.initialProfile ? { ...props.initialProfile } : createEmptyProfile());
   const [result, setResult] = useState<SajuResult | null>(props.initialResult);
   const [error, setError] = useState("");
   const [shareStatus, setShareStatus] = useState("");
   const [editing, setEditing] = useState(!props.initialResult);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => props.initialDate || todayKstDate());
   const reading = useMemo(() => (result ? buildDailyReading(result, date) : null), [result, date]);
+
+  function recordDailyHistory(nextResult: SajuResult, nextDate: string) {
+    const nextReading = buildDailyReading(nextResult, nextDate);
+    props.onHistory({
+      service: "daily",
+      key: `daily-${profileSignature(profile)}-${nextDate}`,
+      dateKey: nextDate,
+      title: nextReading.title,
+      summary: nextReading.summary,
+      score: nextReading.score,
+      meta: `KEYWORD · ${nextReading.keyword}`,
+    });
+  }
+
+  function handleDateChange(nextDate: string) {
+    setDate(nextDate);
+    if (result && nextDate) recordDailyHistory(result, nextDate);
+  }
+
+  useEffect(() => {
+    if (props.initialProfile && props.initialResult) recordDailyHistory(props.initialResult, date);
+  }, [props.initialProfile, props.initialResult, props.initialDate]);
 
   async function handleCardSave() {
     if (!reading) return;
@@ -1226,6 +1374,7 @@ function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult
       setShareStatus("");
       setEditing(false);
       props.onSaved(profile, nextResult);
+      recordDailyHistory(nextResult, date);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "입력값을 확인해주세요.");
@@ -1234,7 +1383,7 @@ function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult
 
   if (editing || !result || !reading) return <div className="page-shell"><PageIntro eyebrow="DAILY RHYTHM" title="오늘의 운세" description="내 사주의 리듬과 오늘의 날짜가 만나는 지점을 가볍게 살펴봅니다." onBack={props.onBack} /><ProfileForm profile={profile} onChange={(next) => setProfile((current) => ({ ...current, ...next }))} onSubmit={handleSubmit} title="오늘의 운세를 위한 정보" description="처음 한 번만 입력하면 다음부터는 바로 오늘의 흐름을 볼 수 있어요." submitLabel="오늘의 운세 보기" error={error} idPrefix="daily" /></div>;
 
-  return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={() => setEditing(true)}>프로필 수정</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div><section className="daily-hero"><div><p className="eyebrow">DAILY RHYTHM · {date.replaceAll("-", ".")}</p><h1>{reading.title}</h1><p>{reading.summary}</p></div><div className="daily-score"><span>오늘의 흐름</span><strong>{reading.score}</strong><small>/ 100</small></div></section><div className="daily-controls"><label><span>다른 날짜 보기</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><span className="keyword-chip">KEYWORD · {reading.keyword}</span></div>{shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}<section className="daily-cards">{reading.cards.map((card) => <article className="daily-card" key={card.label}><span>{card.label}</span><h2>{card.title}</h2><p>{card.body}</p></article>)}</section><section className="daily-reflection"><p className="eyebrow">A SMALL QUESTION</p><h2>오늘 내가 선택할 수 있는<br /><em>가장 작은 변화는 무엇일까요?</em></h2><p>운세를 정답처럼 맞히기보다, 하루를 조금 더 다정하게 설계하는 질문으로 사용해보세요.</p></section><p className="disclaimer">오늘의 운세는 사주 데이터를 바탕으로 만든 참고용 콘텐츠입니다.</p></div>;
+  return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={() => setEditing(true)}>프로필 수정</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div><section className="daily-hero"><div><p className="eyebrow">DAILY RHYTHM · {date.replaceAll("-", ".")}</p><h1>{reading.title}</h1><p>{reading.summary}</p></div><div className="daily-score"><span>오늘의 흐름</span><strong>{reading.score}</strong><small>/ 100</small></div></section><div className="daily-controls"><label><span>다른 날짜 보기</span><input type="date" value={date} onChange={(event) => handleDateChange(event.target.value)} /></label><span className="keyword-chip">KEYWORD · {reading.keyword}</span></div>{shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}<section className="daily-cards">{reading.cards.map((card) => <article className="daily-card" key={card.label}><span>{card.label}</span><h2>{card.title}</h2><p>{card.body}</p></article>)}</section><section className="daily-reflection"><p className="eyebrow">A SMALL QUESTION</p><h2>오늘 내가 선택할 수 있는<br /><em>가장 작은 변화는 무엇일까요?</em></h2><p>운세를 정답처럼 맞히기보다, 하루를 조금 더 다정하게 설계하는 질문으로 사용해보세요.</p></section><p className="disclaimer">오늘의 운세는 사주 데이터를 바탕으로 만든 참고용 콘텐츠입니다.</p></div>;
 }
 
 function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; reading: TojeongReading; onEdit: () => void; onBack: () => void; onTargetYearChange: (year: number) => void }) {
@@ -1286,13 +1435,35 @@ function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; r
   );
 }
 
-function TojeongScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
+function TojeongScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; initialTargetYear?: number; onSaved: (profile: BirthProfile, result: SajuResult) => void; onHistory: (entry: FortuneHistoryDraft) => void; onBack: () => void }) {
   const [profile, setProfile] = useState<BirthProfile>(props.initialProfile ? { ...props.initialProfile } : createEmptyProfile());
   const [result, setResult] = useState<SajuResult | null>(props.initialResult);
-  const [targetYear, setTargetYear] = useState(props.initialResult?.currentYear || new Date().getFullYear());
+  const [targetYear, setTargetYear] = useState(props.initialTargetYear || props.initialResult?.currentYear || new Date().getFullYear());
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(!props.initialResult);
   const reading = useMemo(() => (result ? buildTojeongReading(result, targetYear) : null), [result, targetYear]);
+
+  function recordTojeongHistory(nextResult: SajuResult, nextYear: number) {
+    const nextReading = buildTojeongReading(nextResult, nextYear);
+    props.onHistory({
+      service: "tojeong",
+      key: `tojeong-${profileSignature(profile)}-${nextYear}`,
+      dateKey: String(nextYear),
+      title: nextReading.title,
+      summary: nextReading.summary,
+      meta: `${nextReading.guaCode}괘 · ${nextReading.serialNumber}/144`,
+      targetYear: nextYear,
+    });
+  }
+
+  function handleTargetYearChange(nextYear: number) {
+    setTargetYear(nextYear);
+    if (result) recordTojeongHistory(result, nextYear);
+  }
+
+  useEffect(() => {
+    if (props.initialProfile && props.initialResult) recordTojeongHistory(props.initialResult, targetYear);
+  }, [props.initialProfile, props.initialResult, props.initialTargetYear]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1303,13 +1474,14 @@ function TojeongScreen(props: { initialProfile: BirthProfile | null; initialResu
       setError("");
       setEditing(false);
       props.onSaved(profile, nextResult);
+      recordTojeongHistory(nextResult, nextResult.currentYear);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "입력값을 확인해주세요.");
     }
   }
 
-  if (!editing && result && reading) return <TojeongResultView result={result} profile={profile} reading={reading} onEdit={() => setEditing(true)} onTargetYearChange={setTargetYear} onBack={props.onBack} />;
+  if (!editing && result && reading) return <TojeongResultView result={result} profile={profile} reading={reading} onEdit={() => setEditing(true)} onTargetYearChange={handleTargetYearChange} onBack={props.onBack} />;
 
   return <div className="page-shell"><PageIntro eyebrow="YEARLY GUIDE" title="토정비결" description="한 해의 큰 흐름과 달마다 달라지는 리듬을 차분히 살펴봅니다." onBack={props.onBack} /><ProfileForm profile={profile} onChange={(next) => setProfile((current) => ({ ...current, ...next }))} onSubmit={handleSubmit} title="올해의 흐름을 위한 정보" description="사주 분석에 사용한 출생정보를 바탕으로 토정비결을 안내합니다." submitLabel="토정비결 보기" error={error} idPrefix="tojeong" /></div>;
 }
@@ -1339,12 +1511,16 @@ function CompatibilityResultView(props: { first: BirthProfile; second: BirthProf
   return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>다시 입력</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div>{shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}<section className="compat-hero"><div><p className="eyebrow">TWO OF US · COMPATIBILITY</p><h1>{props.reading.title}</h1><p>{props.reading.summary}</p></div><div className="compat-score"><span>우리의 리듬</span><strong>{props.reading.score}</strong><small>점</small></div></section><div className="pair-pillars"><article><span>나의 일주</span><strong>{props.firstResult.pillars.day}</strong><small>{profileLabel(props.first)}</small></article><div className="pair-symbol">+</div><article><span>상대의 일주</span><strong>{props.secondResult.pillars.day}</strong><small>{profileLabel(props.second)}</small></article></div><section className="content-section"><SectionTitle eyebrow="RELATIONSHIP AXES" title="우리 사이의 세 가지 결" /><div className="compat-axis-grid">{props.reading.axes.map((axis) => <article className="compat-axis" key={axis.label}><div><span>{axis.label}</span><strong>{axis.value}</strong></div><div className="axis-track"><i style={{ width: `${axis.value}%` }} /></div><p>{axis.body}</p></article>)}</div></section><section className="strength-section"><div><p className="eyebrow">GOOD TO KNOW</p><h2>이 관계가 가진<br /><em>좋은 가능성</em></h2></div><ul>{props.reading.strengths.map((strength) => <li key={strength}><span>✓</span>{strength}</li>)}</ul></section><p className="disclaimer">{props.reading.caution}</p></div>;
 }
 
-function CompatibilityScreen(props: { initialProfile: BirthProfile | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
+function CompatibilityScreen(props: { initialProfile: BirthProfile | null; initialSecondProfile?: BirthProfile; onSaved: (profile: BirthProfile, result: SajuResult) => void; onHistory: (entry: FortuneHistoryDraft) => void; onBack: () => void }) {
   const [first, setFirst] = useState<BirthProfile>(props.initialProfile ? { ...props.initialProfile } : createEmptyProfile());
-  const [second, setSecond] = useState<BirthProfile>(createEmptyProfile());
-  const [reading, setReading] = useState<CompatibilityReading | null>(null);
-  const [firstResult, setFirstResult] = useState<SajuResult | null>(null);
-  const [secondResult, setSecondResult] = useState<SajuResult | null>(null);
+  const [second, setSecond] = useState<BirthProfile>(props.initialSecondProfile ? { ...props.initialSecondProfile } : createEmptyProfile());
+  const [firstResult, setFirstResult] = useState<SajuResult | null>(() => props.initialProfile ? safeCalculateProfile(props.initialProfile) : null);
+  const [secondResult, setSecondResult] = useState<SajuResult | null>(() => props.initialSecondProfile ? safeCalculateProfile(props.initialSecondProfile) : null);
+  const [reading, setReading] = useState<CompatibilityReading | null>(() => {
+    const initialFirstResult = props.initialProfile ? safeCalculateProfile(props.initialProfile) : null;
+    const initialSecondResult = props.initialSecondProfile ? safeCalculateProfile(props.initialSecondProfile) : null;
+    return initialFirstResult && initialSecondResult ? buildCompatibilityReading(initialFirstResult, initialSecondResult) : null;
+  });
   const [error, setError] = useState("");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1354,9 +1530,20 @@ function CompatibilityScreen(props: { initialProfile: BirthProfile | null; onSav
       const nextSecondResult = calculateProfile(second);
       setFirstResult(nextFirstResult);
       setSecondResult(nextSecondResult);
-      setReading(buildCompatibilityReading(nextFirstResult, nextSecondResult));
+      const nextReading = buildCompatibilityReading(nextFirstResult, nextSecondResult);
+      setReading(nextReading);
       setError("");
       props.onSaved(first, nextFirstResult);
+      props.onHistory({
+        service: "compatibility",
+        key: `compatibility-${profileSignature(first)}-${profileSignature(second)}`,
+        dateKey: String(nextFirstResult.currentYear),
+        title: nextReading.title,
+        summary: nextReading.summary,
+        score: nextReading.score,
+        meta: `${nextFirstResult.pillars.day} + ${nextSecondResult.pillars.day}`,
+        partnerProfile: { ...second },
+      });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "두 사람의 입력값을 확인해주세요.");
@@ -1409,11 +1596,24 @@ function ZodiacResultView(props: { result: SajuResult; profile: BirthProfile; on
   return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>다시 입력</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div>{shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}<section className="zodiac-hero"><div className="zodiac-orb" aria-hidden="true"><span>✦</span></div><div><p className="eyebrow">STAR MAP · {resultDateLabel(props.result)}</p><h1>{zodiac.zodiac.name}</h1><p>{zodiac.zodiac.trait}</p></div></section><section className="zodiac-duo"><article><span>서양 별자리</span><strong>{zodiac.zodiac.name}</strong><p>{zodiacCopy[zodiac.zodiac.name]}</p></article><article><span>사주 기준 띠</span><strong>{zodiac.animal}</strong><p>{props.result.pillarDetails.year.branchKo} 기운의 해에 태어난 당신의 기본적인 리듬입니다.</p></article></section><section className="zodiac-message"><p className="eyebrow">A NOTE FOR YOU</p><h2>당신의 다름은<br /><em>방향을 찾는 감각</em>이에요.</h2><p>별자리와 띠는 나를 규정하는 라벨이 아니라, 나를 바라보는 또 하나의 언어입니다. 마음에 닿는 문장만 골라 오늘의 선택에 가볍게 사용해보세요.</p><div className="zodiac-tags"><span>{zodiac.zodiac.name}</span><span>{zodiac.animal}</span><span>{leadingElement(props.result)} 기운</span></div></section><p className="disclaimer">별자리 운세는 생년월일을 바탕으로 한 가벼운 참고 콘텐츠입니다.</p></div>;
 }
 
-function ZodiacScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
+function ZodiacScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onHistory: (entry: FortuneHistoryDraft) => void; onBack: () => void }) {
   const [profile, setProfile] = useState<BirthProfile>(props.initialProfile ? { ...props.initialProfile } : createEmptyProfile());
   const [result, setResult] = useState<SajuResult | null>(props.initialResult);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(!props.initialResult);
+
+  useEffect(() => {
+    if (!props.initialProfile || !props.initialResult) return;
+    const zodiac = getZodiacInfo(props.initialResult);
+    props.onHistory({
+      service: "zodiac",
+      key: `zodiac-${profileSignature(props.initialProfile)}`,
+      dateKey: resultDateLabel(props.initialResult),
+      title: zodiac.zodiac.name,
+      summary: zodiac.zodiac.trait,
+      meta: `${zodiac.animal} · 별자리 운세`,
+    });
+  }, [props.initialProfile, props.initialResult]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1423,6 +1623,15 @@ function ZodiacScreen(props: { initialProfile: BirthProfile | null; initialResul
       setError("");
       setEditing(false);
       props.onSaved(profile, nextResult);
+      const zodiac = getZodiacInfo(nextResult);
+      props.onHistory({
+        service: "zodiac",
+        key: `zodiac-${profileSignature(profile)}`,
+        dateKey: resultDateLabel(nextResult),
+        title: zodiac.zodiac.name,
+        summary: zodiac.zodiac.trait,
+        meta: `${zodiac.animal} · 별자리 운세`,
+      });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "입력값을 확인해주세요.");
@@ -1441,7 +1650,9 @@ function Footer() {
 export function App() {
   const [savedProfile, setSavedProfile] = useState<BirthProfile | null>(() => loadStoredProfile());
   const [savedResult, setSavedResult] = useState<SajuResult | null>(() => safeCalculateProfile(loadStoredProfile()));
+  const [history, setHistory] = useState<FortuneHistoryEntry[]>(() => loadStoredHistory());
   const [view, setView] = useState<View>("home");
+  const [historyTarget, setHistoryTarget] = useState<FortuneHistoryEntry | null>(null);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installBannerVisible, setInstallBannerVisible] = useState(false);
 
@@ -1478,7 +1689,8 @@ export function App() {
     }
   }
 
-  function openView(nextView: View) {
+  function openView(nextView: View, target: FortuneHistoryEntry | null = null) {
+    setHistoryTarget(target);
     setView(nextView);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1489,17 +1701,37 @@ export function App() {
     saveStoredProfile(profile);
   }
 
+  function handleHistory(draft: FortuneHistoryDraft) {
+    setHistory((current) => {
+      const nextEntry: FortuneHistoryEntry = { ...draft, id: `${draft.key}-${Date.now()}`, createdAt: new Date().toISOString() };
+      const nextHistory = [nextEntry, ...current.filter((entry) => entry.key !== draft.key)].slice(0, 30);
+      saveStoredHistory(nextHistory);
+      return nextHistory;
+    });
+  }
+
+  function handleClearHistory() {
+    if (!window.confirm("저장된 운세 기록을 모두 삭제할까요?")) return;
+    setHistory([]);
+    saveStoredHistory([]);
+  }
+
+  function openHistoryEntry(entry: FortuneHistoryEntry) {
+    openView(entry.service, entry);
+  }
+
   const hasSavedProfile = Boolean(savedProfile && savedResult);
   const backView: View = hasSavedProfile ? "my" : "home";
   let content: ReactNode;
   if (view === "home") content = <HomeView hasProfile={hasSavedProfile} result={savedResult} onSelect={(nextView) => openView(nextView)} />;
-  if (view === "my" && savedProfile && savedResult) content = <MyHomeView profile={savedProfile} result={savedResult} onSelect={(nextView) => openView(nextView)} onEdit={() => openView("profile")} />;
+  if (view === "my" && savedProfile && savedResult) content = <MyHomeView profile={savedProfile} result={savedResult} history={history} onSelect={(nextView) => openView(nextView)} onEdit={() => openView("profile")} onOpenHistory={() => openView("history")} onOpenEntry={openHistoryEntry} />;
+  if (view === "history") content = <HistoryView entries={history} onBack={() => openView("my")} onOpen={openHistoryEntry} onClear={handleClearHistory} onStart={() => openView("daily")} />;
   if (view === "profile" && savedProfile) content = <ProfileEditorScreen initialProfile={savedProfile} onSaved={handleSaved} onDone={() => openView("my")} onBack={() => openView("my")} />;
-  if (view === "saju") content = <SajuScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView(backView)} />;
-  if (view === "daily") content = <DailyScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView(backView)} />;
-  if (view === "tojeong") content = <TojeongScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView(backView)} />;
-  if (view === "compatibility") content = <CompatibilityScreen initialProfile={savedProfile} onSaved={handleSaved} onBack={() => openView(backView)} />;
-  if (view === "zodiac") content = <ZodiacScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView(backView)} />;
+  if (view === "saju") content = <SajuScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onHistory={handleHistory} onBack={() => openView(backView)} />;
+  if (view === "daily") content = <DailyScreen initialProfile={savedProfile} initialResult={savedResult} initialDate={historyTarget?.service === "daily" ? historyTarget.dateKey : undefined} onSaved={handleSaved} onHistory={handleHistory} onBack={() => openView(backView)} />;
+  if (view === "tojeong") content = <TojeongScreen initialProfile={savedProfile} initialResult={savedResult} initialTargetYear={historyTarget?.service === "tojeong" ? historyTarget.targetYear : undefined} onSaved={handleSaved} onHistory={handleHistory} onBack={() => openView(backView)} />;
+  if (view === "compatibility") content = <CompatibilityScreen initialProfile={savedProfile} initialSecondProfile={historyTarget?.service === "compatibility" ? historyTarget.partnerProfile : undefined} onSaved={handleSaved} onHistory={handleHistory} onBack={() => openView(backView)} />;
+  if (view === "zodiac") content = <ZodiacScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onHistory={handleHistory} onBack={() => openView(backView)} />;
   if (!content) content = <HomeView hasProfile={hasSavedProfile} result={savedResult} onSelect={(nextView) => openView(nextView)} />;
 
   return <div className="app"><Header view={view} hasProfile={hasSavedProfile} installAvailable={Boolean(installPrompt)} onHome={() => openView("home")} onMyHome={() => openView("my")} onInstall={handleInstall} /><main>{content}</main>{installPrompt && installBannerVisible ? <InstallBanner onInstall={handleInstall} onDismiss={() => setInstallBannerVisible(false)} /> : null}<Footer /></div>;
