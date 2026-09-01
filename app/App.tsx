@@ -276,21 +276,6 @@ function leadingElement(result: SajuResult): string {
   return Object.entries(result.fiveElements).sort(([, first], [, second]) => second - first)[0]?.[0] || "목";
 }
 
-function copyText(value: string): Promise<void> {
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(value);
-
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "true");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand("copy");
-  document.body.removeChild(textarea);
-  return Promise.resolve();
-}
-
 function drawWrappedCanvasText(
   context: CanvasRenderingContext2D,
   text: string,
@@ -409,6 +394,150 @@ function downloadBlob(blob: Blob, filename: string) {
   anchor.click();
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+type ShareCardSection = { label: string; title: string; body: string };
+type ShareCardSpec = { kicker: string; title: string; metricLabel: string; metric: string; metricNote: string; summary: string; sections: ShareCardSection[] };
+
+async function createShareCard(card: ShareCardSpec): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1350;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("결과 카드 생성을 지원하지 않는 브라우저입니다.");
+
+  drawCanvasCard(context, 0, 0, canvas.width, canvas.height, "#f7f2eb");
+  drawCanvasCard(context, 0, 0, canvas.width, 335, "#332a43");
+  context.fillStyle = "#f4d59e";
+  context.font = "700 25px 'Malgun Gothic', sans-serif";
+  context.fillText(card.kicker, 72, 78);
+  context.fillStyle = "#fffaf0";
+  context.font = "400 56px 'Batang', 'Malgun Gothic', serif";
+  drawWrappedCanvasText(context, card.title, 72, 155, 650, 72, 2);
+  context.fillStyle = "#f4d59e";
+  context.font = "700 94px 'Batang', 'Malgun Gothic', serif";
+  context.textAlign = "right";
+  context.fillText(card.metric, 1005, 190);
+  context.fillStyle = "rgba(255, 250, 240, 0.7)";
+  context.font = "700 21px 'Malgun Gothic', sans-serif";
+  context.fillText(card.metricNote, 1005, 235);
+  context.textAlign = "left";
+
+  drawCanvasCard(context, 58, 375, 964, 205, "#ede6ee");
+  context.fillStyle = "#b78643";
+  context.font = "700 20px 'Malgun Gothic', sans-serif";
+  context.fillText(card.metricLabel, 88, 420);
+  context.fillStyle = "#272b39";
+  context.font = "400 28px 'Malgun Gothic', sans-serif";
+  drawWrappedCanvasText(context, card.summary, 88, 473, 875, 43, 2);
+
+  const sectionPositions = [
+    [58, 620],
+    [550, 620],
+    [58, 855],
+    [550, 855],
+  ] as const;
+  const sectionFills = ["#e9e1ed", "#f7ecd5", "#f3e2e5", "#e1ebef"];
+  card.sections.slice(0, 4).forEach((section, index) => {
+    const [sectionX, sectionY] = sectionPositions[index];
+    drawCanvasCard(context, sectionX, sectionY, 472, 195, sectionFills[index]);
+    context.fillStyle = "#817b7b";
+    context.font = "700 18px 'Malgun Gothic', sans-serif";
+    context.fillText(section.label, sectionX + 28, sectionY + 38);
+    context.fillStyle = "#272b39";
+    context.font = "700 23px 'Malgun Gothic', sans-serif";
+    drawWrappedCanvasText(context, section.title, sectionX + 28, sectionY + 80, 416, 31, 2);
+    context.fillStyle = "#6f6b70";
+    context.font = "400 17px 'Malgun Gothic', sans-serif";
+    drawWrappedCanvasText(context, section.body, sectionX + 28, sectionY + 141, 416, 25, 2);
+  });
+
+  context.fillStyle = "#a9a19b";
+  context.font = "400 17px 'Malgun Gothic', sans-serif";
+  context.fillText("사주살롱 · 나를 읽는 조용한 시간", 72, 1240);
+  drawWrappedCanvasText(context, "참고용 콘텐츠이며 중요한 결정을 대신하지 않습니다.", 72, 1280, 900, 25, 1);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("결과 카드 이미지를 만들지 못했습니다."));
+    }, "image/png");
+  });
+}
+
+async function shareImageCard(blob: Blob, filename: string, title: string, text: string): Promise<"shared" | "saved"> {
+  const file = new File([blob], filename, { type: "image/png" });
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    await navigator.share({ title, text, files: [file] });
+    return "shared";
+  }
+  downloadBlob(blob, filename);
+  return "saved";
+}
+
+function buildSajuCardSpec(result: SajuResult): ShareCardSpec {
+  const currentDaeun = result.daeun.current;
+  return {
+    kicker: `SAJU LOUNGE · ${resultDateLabel(result)}`,
+    title: "당신의 사주 지도",
+    metricLabel: "YOUR FOUR PILLARS",
+    metric: result.pillars.day,
+    metricNote: "나의 중심 · 일주",
+    summary: result.advanced.interpretation,
+    sections: [
+      { label: "사주 8글자", title: `${result.pillars.year} · ${result.pillars.month}`, body: `${result.pillars.day} · ${result.pillars.hour}의 흐름을 함께 살펴봅니다.` },
+      { label: "일간 강약", title: result.advanced.dayStrength.strength === "strong" ? "단단하게 뻗는 기운" : result.advanced.dayStrength.strength === "weak" ? "유연하게 흐르는 기운" : "균형을 찾아가는 기운", body: `${result.advanced.dayStrength.score} point · ${result.advanced.geukguk}` },
+      { label: "오행의 균형", title: `${leadingElement(result)} 기운이 선명해요`, body: "강점을 생활 속 선택으로 먼저 사용해보세요." },
+      { label: "시간의 흐름", title: currentDaeun?.ganzhi || "현재 대운", body: currentDaeun ? `${currentDaeun.startAge}~${currentDaeun.endAge}세 · ${currentDaeun.stemTenGod} · ${currentDaeun.branchTenGod}` : "대운 흐름을 확인해보세요." },
+    ],
+  };
+}
+
+function buildDailyCardSpec(reading: DailyReading, date: string): ShareCardSpec {
+  return {
+    kicker: `SAJU LOUNGE · ${date.replaceAll("-", ".")}`,
+    title: reading.title,
+    metricLabel: "DAILY RHYTHM",
+    metric: String(reading.score),
+    metricNote: "/ 100",
+    summary: reading.summary,
+    sections: [
+      ...reading.cards,
+      { label: "오늘의 키워드", title: reading.keyword, body: "오늘의 흐름을 정답보다 하루를 설계하는 힌트로 사용해보세요." },
+    ],
+  };
+}
+
+function buildCompatibilityCardSpec(reading: CompatibilityReading, first: SajuResult, second: SajuResult): ShareCardSpec {
+  return {
+    kicker: "SAJU LOUNGE · TWO OF US",
+    title: reading.title,
+    metricLabel: "OUR RHYTHM",
+    metric: String(reading.score),
+    metricNote: "/ 100",
+    summary: reading.summary,
+    sections: [
+      { label: "두 사람의 중심", title: `${first.pillars.day} + ${second.pillars.day}`, body: "서로의 중심 기운이 만나는 관계의 출발점입니다." },
+      ...reading.axes.slice(0, 2).map((axis) => ({ label: axis.label, title: `${axis.value}점의 리듬`, body: axis.body })),
+      { label: "좋은 가능성", title: "함께 키울 수 있는 장면", body: reading.strengths.join(" ") },
+    ],
+  };
+}
+
+function buildZodiacCardSpec(result: SajuResult, zodiac: ReturnType<typeof getZodiacInfo>, zodiacCopy: string): ShareCardSpec {
+  return {
+    kicker: `SAJU LOUNGE · ${resultDateLabel(result)}`,
+    title: zodiac.zodiac.name,
+    metricLabel: "STAR MAP",
+    metric: zodiac.animal,
+    metricNote: "사주 기준 띠",
+    summary: zodiacCopy,
+    sections: [
+      { label: "서양 별자리", title: zodiac.zodiac.name, body: zodiac.zodiac.trait },
+      { label: "사주 기준 띠", title: zodiac.animal, body: `${result.pillarDetails.year.branchKo} 기운의 해에 태어난 당신의 기본 리듬입니다.` },
+      { label: "오늘의 관점", title: "당신의 다름은 방향을 찾는 감각", body: "마음에 닿는 문장만 골라 오늘의 선택에 가볍게 사용해보세요." },
+    ],
+  };
 }
 
 function getZodiacInfo(result: SajuResult) {
@@ -810,25 +939,30 @@ function SajuResultView(props: { result: SajuResult; profile: BirthProfile; onEd
   const topicReadings = buildTopicReadings(props.result);
   const [selectedTopicId, setSelectedTopicId] = useState(topicReadings[0]?.id || "love");
   const selectedTopic = topicReadings.find((topic) => topic.id === selectedTopicId) || topicReadings[0];
-  const resultShareText = `사주살롱\n${resultDateLabel(props.result)} · ${props.result.pillars.year} ${props.result.pillars.month} ${props.result.pillars.day} ${props.result.pillars.hour}\n일주: ${props.result.pillars.day}\n${props.result.advanced.interpretation}`;
 
-  async function handleShare() {
+  async function handleCardSave() {
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "사주살롱 사주 결과", text: resultShareText });
-        setShareStatus("공유 창을 열었습니다.");
-      } else {
-        await copyText(resultShareText);
-        setShareStatus("결과를 클립보드에 복사했습니다.");
-      }
+      const blob = await createShareCard(buildSajuCardSpec(props.result));
+      downloadBlob(blob, `saju-lounge-saju-${props.result.pillars.day}.png`);
+      setShareStatus("사주 결과 카드를 저장했습니다.");
     } catch {
-      setShareStatus("공유를 취소했거나 브라우저가 지원하지 않습니다.");
+      setShareStatus("결과 카드 저장에 실패했습니다.");
+    }
+  }
+
+  async function handleCardShare() {
+    try {
+      const blob = await createShareCard(buildSajuCardSpec(props.result));
+      const outcome = await shareImageCard(blob, `saju-lounge-saju-${props.result.pillars.day}.png`, "사주살롱 사주 결과", "나의 사주 결과 카드");
+      setShareStatus(outcome === "shared" ? "사주 결과 카드를 공유했습니다." : "이미지 공유를 지원하지 않아 카드를 저장했습니다.");
+    } catch {
+      setShareStatus("카드 공유를 취소했거나 브라우저가 지원하지 않습니다.");
     }
   }
 
   return (
     <div className="result-page">
-      <div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>입력 수정</button><button className="primary-button small-button" type="button" onClick={handleShare}>결과 공유</button></div></div>
+      <div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>입력 수정</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div>
       {shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}
 
       <section className="result-hero-card">
@@ -929,9 +1063,32 @@ function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult
   const [profile, setProfile] = useState<BirthProfile>(props.initialProfile ? { ...props.initialProfile } : createEmptyProfile());
   const [result, setResult] = useState<SajuResult | null>(props.initialResult);
   const [error, setError] = useState("");
+  const [shareStatus, setShareStatus] = useState("");
   const [editing, setEditing] = useState(!props.initialResult);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const reading = useMemo(() => (result ? buildDailyReading(result, date) : null), [result, date]);
+
+  async function handleCardSave() {
+    if (!reading) return;
+    try {
+      const blob = await createShareCard(buildDailyCardSpec(reading, date));
+      downloadBlob(blob, `saju-lounge-daily-${date}.png`);
+      setShareStatus("오늘의 운세 카드를 저장했습니다.");
+    } catch {
+      setShareStatus("결과 카드 저장에 실패했습니다.");
+    }
+  }
+
+  async function handleCardShare() {
+    if (!reading) return;
+    try {
+      const blob = await createShareCard(buildDailyCardSpec(reading, date));
+      const outcome = await shareImageCard(blob, `saju-lounge-daily-${date}.png`, "사주살롱 오늘의 운세", `${date} 오늘의 운세 결과 카드`);
+      setShareStatus(outcome === "shared" ? "오늘의 운세 카드를 공유했습니다." : "이미지 공유를 지원하지 않아 카드를 저장했습니다.");
+    } catch {
+      setShareStatus("카드 공유를 취소했거나 브라우저가 지원하지 않습니다.");
+    }
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -939,6 +1096,7 @@ function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult
       const nextResult = calculateProfile(profile);
       setResult(nextResult);
       setError("");
+      setShareStatus("");
       setEditing(false);
       props.onSaved(profile, nextResult);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -949,7 +1107,7 @@ function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult
 
   if (editing || !result || !reading) return <div className="page-shell"><PageIntro eyebrow="DAILY RHYTHM" title="오늘의 운세" description="내 사주의 리듬과 오늘의 날짜가 만나는 지점을 가볍게 살펴봅니다." onBack={props.onBack} /><ProfileForm profile={profile} onChange={(next) => setProfile((current) => ({ ...current, ...next }))} onSubmit={handleSubmit} title="오늘의 운세를 위한 정보" description="처음 한 번만 입력하면 다음부터는 바로 오늘의 흐름을 볼 수 있어요." submitLabel="오늘의 운세 보기" error={error} idPrefix="daily" /></div>;
 
-  return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><button className="secondary-button" type="button" onClick={() => setEditing(true)}>프로필 수정</button></div><section className="daily-hero"><div><p className="eyebrow">DAILY RHYTHM · {date.replaceAll("-", ".")}</p><h1>{reading.title}</h1><p>{reading.summary}</p></div><div className="daily-score"><span>오늘의 흐름</span><strong>{reading.score}</strong><small>/ 100</small></div></section><div className="daily-controls"><label><span>다른 날짜 보기</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><span className="keyword-chip">KEYWORD · {reading.keyword}</span></div><section className="daily-cards">{reading.cards.map((card) => <article className="daily-card" key={card.label}><span>{card.label}</span><h2>{card.title}</h2><p>{card.body}</p></article>)}</section><section className="daily-reflection"><p className="eyebrow">A SMALL QUESTION</p><h2>오늘 내가 선택할 수 있는<br /><em>가장 작은 변화는 무엇일까요?</em></h2><p>운세를 정답처럼 맞히기보다, 하루를 조금 더 다정하게 설계하는 질문으로 사용해보세요.</p></section><p className="disclaimer">오늘의 운세는 사주 데이터를 바탕으로 만든 참고용 콘텐츠입니다.</p></div>;
+  return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={() => setEditing(true)}>프로필 수정</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div><section className="daily-hero"><div><p className="eyebrow">DAILY RHYTHM · {date.replaceAll("-", ".")}</p><h1>{reading.title}</h1><p>{reading.summary}</p></div><div className="daily-score"><span>오늘의 흐름</span><strong>{reading.score}</strong><small>/ 100</small></div></section><div className="daily-controls"><label><span>다른 날짜 보기</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><span className="keyword-chip">KEYWORD · {reading.keyword}</span></div>{shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}<section className="daily-cards">{reading.cards.map((card) => <article className="daily-card" key={card.label}><span>{card.label}</span><h2>{card.title}</h2><p>{card.body}</p></article>)}</section><section className="daily-reflection"><p className="eyebrow">A SMALL QUESTION</p><h2>오늘 내가 선택할 수 있는<br /><em>가장 작은 변화는 무엇일까요?</em></h2><p>운세를 정답처럼 맞히기보다, 하루를 조금 더 다정하게 설계하는 질문으로 사용해보세요.</p></section><p className="disclaimer">오늘의 운세는 사주 데이터를 바탕으로 만든 참고용 콘텐츠입니다.</p></div>;
 }
 
 function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; reading: TojeongReading; onEdit: () => void; onBack: () => void; onTargetYearChange: (year: number) => void }) {
@@ -1031,18 +1189,27 @@ function TojeongScreen(props: { initialProfile: BirthProfile | null; initialResu
 
 function CompatibilityResultView(props: { first: BirthProfile; second: BirthProfile; firstResult: SajuResult; secondResult: SajuResult; reading: CompatibilityReading; onEdit: () => void; onBack: () => void }) {
   const [shareStatus, setShareStatus] = useState("");
-  async function handleShare() {
-    const text = `사주살롱 궁합 분석\n${props.reading.title}\n궁합 점수 ${props.reading.score}점\n${props.reading.summary}`;
+  async function handleCardSave() {
     try {
-      if (navigator.share) await navigator.share({ title: "사주살롱 궁합 분석", text });
-      else await copyText(text);
-      setShareStatus("결과를 공유할 준비가 되었습니다.");
+      const blob = await createShareCard(buildCompatibilityCardSpec(props.reading, props.firstResult, props.secondResult));
+      downloadBlob(blob, `saju-lounge-compatibility-${props.reading.score}.png`);
+      setShareStatus("궁합 결과 카드를 저장했습니다.");
     } catch {
-      setShareStatus("공유를 취소했거나 브라우저가 지원하지 않습니다.");
+      setShareStatus("결과 카드 저장에 실패했습니다.");
     }
   }
 
-  return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>다시 입력</button><button className="primary-button small-button" type="button" onClick={handleShare}>결과 공유</button></div></div>{shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}<section className="compat-hero"><div><p className="eyebrow">TWO OF US · COMPATIBILITY</p><h1>{props.reading.title}</h1><p>{props.reading.summary}</p></div><div className="compat-score"><span>우리의 리듬</span><strong>{props.reading.score}</strong><small>점</small></div></section><div className="pair-pillars"><article><span>나의 일주</span><strong>{props.firstResult.pillars.day}</strong><small>{profileLabel(props.first)}</small></article><div className="pair-symbol">+</div><article><span>상대의 일주</span><strong>{props.secondResult.pillars.day}</strong><small>{profileLabel(props.second)}</small></article></div><section className="content-section"><SectionTitle eyebrow="RELATIONSHIP AXES" title="우리 사이의 세 가지 결" /><div className="compat-axis-grid">{props.reading.axes.map((axis) => <article className="compat-axis" key={axis.label}><div><span>{axis.label}</span><strong>{axis.value}</strong></div><div className="axis-track"><i style={{ width: `${axis.value}%` }} /></div><p>{axis.body}</p></article>)}</div></section><section className="strength-section"><div><p className="eyebrow">GOOD TO KNOW</p><h2>이 관계가 가진<br /><em>좋은 가능성</em></h2></div><ul>{props.reading.strengths.map((strength) => <li key={strength}><span>✓</span>{strength}</li>)}</ul></section><p className="disclaimer">{props.reading.caution}</p></div>;
+  async function handleCardShare() {
+    try {
+      const blob = await createShareCard(buildCompatibilityCardSpec(props.reading, props.firstResult, props.secondResult));
+      const outcome = await shareImageCard(blob, `saju-lounge-compatibility-${props.reading.score}.png`, "사주살롱 궁합 분석", props.reading.title);
+      setShareStatus(outcome === "shared" ? "궁합 결과 카드를 공유했습니다." : "이미지 공유를 지원하지 않아 카드를 저장했습니다.");
+    } catch {
+      setShareStatus("카드 공유를 취소했거나 브라우저가 지원하지 않습니다.");
+    }
+  }
+
+  return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>다시 입력</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div>{shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}<section className="compat-hero"><div><p className="eyebrow">TWO OF US · COMPATIBILITY</p><h1>{props.reading.title}</h1><p>{props.reading.summary}</p></div><div className="compat-score"><span>우리의 리듬</span><strong>{props.reading.score}</strong><small>점</small></div></section><div className="pair-pillars"><article><span>나의 일주</span><strong>{props.firstResult.pillars.day}</strong><small>{profileLabel(props.first)}</small></article><div className="pair-symbol">+</div><article><span>상대의 일주</span><strong>{props.secondResult.pillars.day}</strong><small>{profileLabel(props.second)}</small></article></div><section className="content-section"><SectionTitle eyebrow="RELATIONSHIP AXES" title="우리 사이의 세 가지 결" /><div className="compat-axis-grid">{props.reading.axes.map((axis) => <article className="compat-axis" key={axis.label}><div><span>{axis.label}</span><strong>{axis.value}</strong></div><div className="axis-track"><i style={{ width: `${axis.value}%` }} /></div><p>{axis.body}</p></article>)}</div></section><section className="strength-section"><div><p className="eyebrow">GOOD TO KNOW</p><h2>이 관계가 가진<br /><em>좋은 가능성</em></h2></div><ul>{props.reading.strengths.map((strength) => <li key={strength}><span>✓</span>{strength}</li>)}</ul></section><p className="disclaimer">{props.reading.caution}</p></div>;
 }
 
 function CompatibilityScreen(props: { initialProfile: BirthProfile | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
@@ -1075,6 +1242,7 @@ function CompatibilityScreen(props: { initialProfile: BirthProfile | null; onSav
 }
 
 function ZodiacResultView(props: { result: SajuResult; profile: BirthProfile; onEdit: () => void; onBack: () => void }) {
+  const [shareStatus, setShareStatus] = useState("");
   const zodiac = getZodiacInfo(props.result);
   const zodiacCopy: Record<string, string> = {
     염소자리: "목표를 향해 한 걸음씩 나아갈 때 가장 자연스러운 매력이 드러납니다.",
@@ -1091,7 +1259,27 @@ function ZodiacResultView(props: { result: SajuResult; profile: BirthProfile; on
     사수자리: "새로운 경험을 향해 나아갈 때 삶의 반경이 자연스럽게 넓어집니다.",
   };
 
-  return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><button className="secondary-button" type="button" onClick={props.onEdit}>다시 입력</button></div><section className="zodiac-hero"><div className="zodiac-orb" aria-hidden="true"><span>✦</span></div><div><p className="eyebrow">STAR MAP · {resultDateLabel(props.result)}</p><h1>{zodiac.zodiac.name}</h1><p>{zodiac.zodiac.trait}</p></div></section><section className="zodiac-duo"><article><span>서양 별자리</span><strong>{zodiac.zodiac.name}</strong><p>{zodiacCopy[zodiac.zodiac.name]}</p></article><article><span>사주 기준 띠</span><strong>{zodiac.animal}</strong><p>{props.result.pillarDetails.year.branchKo} 기운의 해에 태어난 당신의 기본적인 리듬입니다.</p></article></section><section className="zodiac-message"><p className="eyebrow">A NOTE FOR YOU</p><h2>당신의 다름은<br /><em>방향을 찾는 감각</em>이에요.</h2><p>별자리와 띠는 나를 규정하는 라벨이 아니라, 나를 바라보는 또 하나의 언어입니다. 마음에 닿는 문장만 골라 오늘의 선택에 가볍게 사용해보세요.</p><div className="zodiac-tags"><span>{zodiac.zodiac.name}</span><span>{zodiac.animal}</span><span>{leadingElement(props.result)} 기운</span></div></section><p className="disclaimer">별자리 운세는 생년월일을 바탕으로 한 가벼운 참고 콘텐츠입니다.</p></div>;
+  async function handleCardSave() {
+    try {
+      const blob = await createShareCard(buildZodiacCardSpec(props.result, zodiac, zodiacCopy[zodiac.zodiac.name]));
+      downloadBlob(blob, `saju-lounge-zodiac-${zodiac.zodiac.name}.png`);
+      setShareStatus("별자리 결과 카드를 저장했습니다.");
+    } catch {
+      setShareStatus("결과 카드 저장에 실패했습니다.");
+    }
+  }
+
+  async function handleCardShare() {
+    try {
+      const blob = await createShareCard(buildZodiacCardSpec(props.result, zodiac, zodiacCopy[zodiac.zodiac.name]));
+      const outcome = await shareImageCard(blob, `saju-lounge-zodiac-${zodiac.zodiac.name}.png`, "사주살롱 별자리 운세", zodiac.zodiac.name);
+      setShareStatus(outcome === "shared" ? "별자리 결과 카드를 공유했습니다." : "이미지 공유를 지원하지 않아 카드를 저장했습니다.");
+    } catch {
+      setShareStatus("카드 공유를 취소했거나 브라우저가 지원하지 않습니다.");
+    }
+  }
+
+  return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>다시 입력</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div>{shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}<section className="zodiac-hero"><div className="zodiac-orb" aria-hidden="true"><span>✦</span></div><div><p className="eyebrow">STAR MAP · {resultDateLabel(props.result)}</p><h1>{zodiac.zodiac.name}</h1><p>{zodiac.zodiac.trait}</p></div></section><section className="zodiac-duo"><article><span>서양 별자리</span><strong>{zodiac.zodiac.name}</strong><p>{zodiacCopy[zodiac.zodiac.name]}</p></article><article><span>사주 기준 띠</span><strong>{zodiac.animal}</strong><p>{props.result.pillarDetails.year.branchKo} 기운의 해에 태어난 당신의 기본적인 리듬입니다.</p></article></section><section className="zodiac-message"><p className="eyebrow">A NOTE FOR YOU</p><h2>당신의 다름은<br /><em>방향을 찾는 감각</em>이에요.</h2><p>별자리와 띠는 나를 규정하는 라벨이 아니라, 나를 바라보는 또 하나의 언어입니다. 마음에 닿는 문장만 골라 오늘의 선택에 가볍게 사용해보세요.</p><div className="zodiac-tags"><span>{zodiac.zodiac.name}</span><span>{zodiac.animal}</span><span>{leadingElement(props.result)} 기운</span></div></section><p className="disclaimer">별자리 운세는 생년월일을 바탕으로 한 가벼운 참고 콘텐츠입니다.</p></div>;
 }
 
 function ZodiacScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
