@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import { calculateTojeong } from "../src/tojeong.ts";
+import { getTojeongContent, TOJEONG_CONTENT } from "../src/tojeong-content.ts";
 
 function assertEquals<T>(actual: T, expected: T, message: string) {
   const a = JSON.stringify(actual);
@@ -56,3 +57,13 @@ test("every input resolves to one of the 144 combinations", () => {
   }
 });
 
+test("the app has a distinct in-house interpretation for all 144 gua codes", () => {
+  assertEquals(TOJEONG_CONTENT.length, 144, "content count");
+  assertEquals(new Set(TOJEONG_CONTENT.map((content) => content.code)).size, 144, "unique gua codes");
+
+  for (const content of TOJEONG_CONTENT) {
+    assertEquals(getTojeongContent(content.code), content, `content lookup for ${content.code}`);
+    assertEquals(content.months.length, 12, `monthly content for ${content.code}`);
+    assertEquals(content.themes.length, 4, `theme content for ${content.code}`);
+  }
+});
