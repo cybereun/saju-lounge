@@ -337,13 +337,13 @@ function buildDailyReading(result: SajuResult, date: string): DailyReading {
   };
 }
 
-function buildTojeongReading(result: SajuResult): TojeongReading {
+function buildTojeongReading(result: SajuResult, targetYear = result.currentYear): TojeongReading {
   const lunarBirth = solarToLunar(result.normalized.solar.year, result.normalized.solar.month, result.normalized.solar.day);
   const calculation = calculateTojeong({
     lunarBirthYear: lunarBirth.year,
     lunarBirthMonth: lunarBirth.month,
     lunarBirthDay: lunarBirth.day,
-    targetYear: result.currentYear,
+    targetYear,
   });
   const { upper, middle, lower } = calculation.gua;
   const element = leadingElement(result);
@@ -861,7 +861,7 @@ function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult
   return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><button className="secondary-button" type="button" onClick={() => setEditing(true)}>프로필 수정</button></div><section className="daily-hero"><div><p className="eyebrow">DAILY RHYTHM · {date.replaceAll("-", ".")}</p><h1>{reading.title}</h1><p>{reading.summary}</p></div><div className="daily-score"><span>오늘의 흐름</span><strong>{reading.score}</strong><small>/ 100</small></div></section><div className="daily-controls"><label><span>다른 날짜 보기</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><span className="keyword-chip">KEYWORD · {reading.keyword}</span></div><section className="daily-cards">{reading.cards.map((card) => <article className="daily-card" key={card.label}><span>{card.label}</span><h2>{card.title}</h2><p>{card.body}</p></article>)}</section><section className="daily-reflection"><p className="eyebrow">A SMALL QUESTION</p><h2>오늘 내가 선택할 수 있는<br /><em>가장 작은 변화는 무엇일까요?</em></h2><p>운세를 정답처럼 맞히기보다, 하루를 조금 더 다정하게 설계하는 질문으로 사용해보세요.</p></section><p className="disclaimer">오늘의 운세는 사주 데이터를 바탕으로 만든 참고용 콘텐츠입니다.</p></div>;
 }
 
-function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; reading: TojeongReading; onEdit: () => void; onBack: () => void }) {
+function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; reading: TojeongReading; onEdit: () => void; onBack: () => void; onTargetYearChange: (year: number) => void }) {
   const [shareStatus, setShareStatus] = useState("");
   const shareText = `사주살롱 토정비결\n${props.reading.year}년 · ${props.reading.title}\n${props.reading.summary}`;
 
@@ -880,7 +880,7 @@ function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; r
 
   return (
     <div className="result-page">
-      <div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>프로필 수정</button><button className="primary-button small-button" type="button" onClick={handleShare}>결과 공유</button></div></div>
+      <div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><label className="tojeong-year-control"><span>풀이 연도</span><select value={props.reading.year} onChange={(event) => props.onTargetYearChange(Number(event.target.value))}>{Array.from({ length: 7 }, (_, index) => props.result.currentYear - 2 + index).map((year) => <option value={year} key={year}>{year}년</option>)}</select></label><button className="secondary-button" type="button" onClick={props.onEdit}>프로필 수정</button><button className="primary-button small-button" type="button" onClick={handleShare}>결과 공유</button></div></div>
       {shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}
       <section className="tojeong-hero">
         <div><p className="eyebrow">YEARLY GUIDE · {props.reading.year} · {props.reading.calculation.targetYearGanji}</p><h1>{props.reading.title}</h1><p>{profileLabel(props.profile)} · 전통 144괘 작괘 결과를 확인해보세요.</p></div>
@@ -901,15 +901,17 @@ function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; r
 function TojeongScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
   const [profile, setProfile] = useState<BirthProfile>(props.initialProfile ? { ...props.initialProfile } : createEmptyProfile());
   const [result, setResult] = useState<SajuResult | null>(props.initialResult);
+  const [targetYear, setTargetYear] = useState(props.initialResult?.currentYear || new Date().getFullYear());
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(!props.initialResult);
-  const reading = useMemo(() => (result ? buildTojeongReading(result) : null), [result]);
+  const reading = useMemo(() => (result ? buildTojeongReading(result, targetYear) : null), [result, targetYear]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
       const nextResult = calculateProfile(profile);
       setResult(nextResult);
+      setTargetYear(nextResult.currentYear);
       setError("");
       setEditing(false);
       props.onSaved(profile, nextResult);
@@ -919,7 +921,7 @@ function TojeongScreen(props: { initialProfile: BirthProfile | null; initialResu
     }
   }
 
-  if (!editing && result && reading) return <TojeongResultView result={result} profile={profile} reading={reading} onEdit={() => setEditing(true)} onBack={props.onBack} />;
+  if (!editing && result && reading) return <TojeongResultView result={result} profile={profile} reading={reading} onEdit={() => setEditing(true)} onTargetYearChange={setTargetYear} onBack={props.onBack} />;
 
   return <div className="page-shell"><PageIntro eyebrow="YEARLY GUIDE" title="토정비결" description="한 해의 큰 흐름과 달마다 달라지는 리듬을 차분히 살펴봅니다." onBack={props.onBack} /><ProfileForm profile={profile} onChange={(next) => setProfile((current) => ({ ...current, ...next }))} onSubmit={handleSubmit} title="올해의 흐름을 위한 정보" description="사주 분석에 사용한 출생정보를 바탕으로 토정비결을 안내합니다." submitLabel="토정비결 보기" error={error} idPrefix="tojeong" /></div>;
 }
