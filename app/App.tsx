@@ -55,6 +55,9 @@ type TopicReading = {
   label: string;
   title: string;
   body: string;
+  detail: string;
+  tip: string;
+  caution: string;
   score: number;
   tone: string;
 };
@@ -361,6 +364,9 @@ function buildTopicReadings(result: SajuResult): TopicReading[] {
       label: "\uc5f0\uc560",
       title: strength === "strong" ? "\ub9c8\uc74c\uc744 \uc194\uc9c1\ud558\uac8c \ubcf4\uc5ec\uc904\uc218\ub85d \uac00\uae4c\uc6cc\uc838\uc694" : "\uc791\uc740 \uc548\ubd80\uc5d0\uc11c \uc2dc\uc791\ud558\ub294 \uad00\uacc4",
       body: strength === "strong" ? "\ub610\ub837\ud55c \ud45c\ud604\ubcf4\ub2e4 \uc0c1\ub300\uc758 \ub9ac\ub4ec\uc744 \ud568\uaed8 \ubcf4\uba74 \uad00\uacc4\uc758 \uc628\ub3c4\uac00 \ub192\uc544\uc838\uc694." : "\uc11c\ub450\ub974\uc9c0 \uc54a\uc740 \ub300\ud654\uc640 \uc791\uc740 \ud45c\ud604\uc774 \uc2e0\ub8b0\ub97c \ud0a4\uc6cc\uc694.",
+      detail: "나의 일간 강약을 기준으로 보면 관계에서 먼저 표현할 때와 천천히 확인할 때의 균형이 중요해요. 상대의 반응을 기다리는 여백이 마음을 더 오래 전합니다.",
+      tip: "짧은 안부나 고마웠던 일을 먼저 전해보세요.",
+      caution: "감정을 혼자 해석하기보다 한 번은 부드럽게 물어보세요.",
       score: score(72, 22),
       tone: "rose",
     },
@@ -370,6 +376,9 @@ function buildTopicReadings(result: SajuResult): TopicReading[] {
       label: "\uc7ac\ubb3c",
       title: "\ud070 \uacb0\uc815\ubcf4\ub2e4 \uc791\uc740 \uc2b5\uad00\uc774 \uc6b4\uc744 \ub9cc\ub4e4\uc5b4\uc694",
       body: element + " \uae30\uc6b4\uc758 \uc7a5\uc810\uc744 \uc0b4\ub9ac\ub294 \ud558\ub8e8\uc608\uc694. \ud558\ub8e8 \ud558\ub098\uc758 \uc9c0\ucd9c\uacfc \ubaa9\ud45c\ub97c \uae30\ub85d\ud574\ubcf4\uc138\uc694.",
+      detail: "가장 선명한 오행의 장점을 생활 습관으로 옮길 때 재물 흐름이 안정됩니다. 큰 결정보다 반복 가능한 관리가 먼저예요.",
+      tip: "오늘의 지출 한 가지와 다음 목표 하나를 기록하세요.",
+      caution: "점수만으로 투자나 소비 결정을 내리지는 마세요.",
       score: score(68, 25),
       tone: "gold",
     },
@@ -379,6 +388,9 @@ function buildTopicReadings(result: SajuResult): TopicReading[] {
       label: "\uc9c1\uc5c5",
       title: strength === "weak" ? "\ud63c\uc790 \ubc00\uc5b4\ubd99\uae30\ubcf4\ub2e4 \uc5f0\uacb0\uc5d0\uc11c \ud798\uc774 \uc0dd\uaca8\uc694" : "\ubc29\ud5a5\uc744 \ubd84\uba85\ud788 \ud558\uba74 \ucd94\uc9c4\ub825\uc774 \uc0dd\uae30\uc5d0\uc694",
       body: strength === "weak" ? "\ud544\uc694\ud55c \ub3c4\uc6c0\uc744 \uc694\uccad\ud558\uace0 \uc5ed\ud560\uc744 \ub098\ub204\ub294 \uac83\uc774 \uc2e4\ub825\uc744 \ub9cc\ub4e4\uc5b4\uc694." : "\uc911\uc2ec \uac00\uce58\ub97c \uba3c\uc800 \uc815\ud558\uba74 \uc624\ub298\uc758 \uc77c\uc774 \uc120\uba85\ud574\uc838\uc694.",
+      detail: "일간 강약이 약한 편이면 연결과 협업이, 강한 편이면 방향과 우선순위가 능력을 더 잘 드러내게 해요.",
+      tip: "오늘 반드시 끝낼 일 한 가지를 가장 먼저 정하세요.",
+      caution: "모든 일을 혼자 책임지려 하지 않아도 괜찮아요.",
       score: score(70, 24),
       tone: "plum",
     },
@@ -388,6 +400,9 @@ function buildTopicReadings(result: SajuResult): TopicReading[] {
       label: "\uac74\uac15",
       title: "\ub9ac\ub4ec\uc744 \uc9c0\ud0a4\ub294 \uac83\uc774 \uac00\uc7a5 \uc911\uc694\ud574\uc694",
       body: "\ubab8\uc758 \uc2e0\ud638\ub97c \uacb0\uacfc\ubcf4\ub2e4 \uba3c\uc800 \ub4e4\uc5b4\ubcf4\uc138\uc694. \uc7a0\uacfc \uc2dd\uc0ac\uc758 \ub9ac\ub4ec\uc744 \uc791\uac8c\ub77c\ub3c4 \ubc18\ubcf5\ud574\ubcf4\uc138\uc694.",
+      detail: "건강 카드는 의료적 판단이 아니라 생활 리듬을 돌아보는 참고 신호입니다. 몸이 보내는 작은 피로를 무시하지 않는 것이 핵심이에요.",
+      tip: "물 마시기·스트레칭·취침 시간을 하나만 정해 반복해보세요.",
+      caution: "불편한 증상이 있으면 전문가의 진료와 상담을 우선하세요.",
       score: score(74, 19),
       tone: "blue",
     },
@@ -605,6 +620,8 @@ function SajuResultView(props: { result: SajuResult; profile: BirthProfile; onEd
   const currentDaeun = props.result.daeun.current;
   const currentSeyun = props.result.seyun.find((item) => item.year === props.result.currentYear);
   const topicReadings = buildTopicReadings(props.result);
+  const [selectedTopicId, setSelectedTopicId] = useState(topicReadings[0]?.id || "love");
+  const selectedTopic = topicReadings.find((topic) => topic.id === selectedTopicId) || topicReadings[0];
   const resultShareText = `사주살롱\n${resultDateLabel(props.result)} · ${props.result.pillars.year} ${props.result.pillars.month} ${props.result.pillars.day} ${props.result.pillars.hour}\n일주: ${props.result.pillars.day}\n${props.result.advanced.interpretation}`;
 
   async function handleShare() {
@@ -651,19 +668,32 @@ function SajuResultView(props: { result: SajuResult; profile: BirthProfile; onEd
         <div className="element-card"><div className="element-bars">{ELEMENT_ORDER.map((element) => { const count = props.result.fiveElements[element] || 0; return <div className="element-row" key={element}><span>{element}</span><div className="element-track"><i className={`element-fill element-${element}`} style={{ width: `${Math.max(8, count * 12)}%` }} /></div><strong>{count}</strong></div>; })}</div><div className="element-note"><span>오늘의 힌트</span><p><b>{leadingElement(props.result)}</b> 기운이 가장 선명합니다. 이 기운의 장점을 살리는 선택부터 시도해보세요.</p></div></div>
       </section>
 
-<section className="content-section topic-section">
-        <SectionTitle eyebrow="FOUR DIRECTIONS" title="\uc9c0\uae08 \uad81\uae08\ud55c \uc8fc\uc81c\ub97c \uace8\ub77c\ubcf4\uc138\uc694" />
+      <section className="content-section topic-section">
+        <SectionTitle eyebrow="FOUR DIRECTIONS" title="지금 궁금한 주제를 골라보세요" />
         <div className="topic-grid">
           {topicReadings.map((topic) => (
-            <article className={"topic-card " + topic.tone} key={topic.id}>
+            <button className={"topic-card " + topic.tone + (selectedTopic?.id === topic.id ? " selected" : "")} type="button" key={topic.id} onClick={() => setSelectedTopicId(topic.id)} aria-pressed={selectedTopic?.id === topic.id}>
               <div className="topic-card-top"><span className="topic-icon">{topic.icon}</span><span className="topic-label">{topic.label}</span><strong>{topic.score}</strong></div>
               <h3>{topic.title}</h3>
               <p>{topic.body}</p>
               <div className="topic-track" aria-label={topic.label + " " + topic.score + "\uc810"}><i style={{ width: topic.score + "%" }} /></div>
-            </article>
+            </button>
           ))}
         </div>
-        <p className="topic-note">\uac01 \uc810\uc218\ub294 \uc815\ubc00\ud55c \uc608\uce21\uc774 \uc544\ub2c8\ub77c, \ud604\uc7ac \uad00\uc2ec\uc744 \uae30\uc6b8\uc774\ub294 \ucc38\uace0 \uc9c0\ud45c\uc785\ub2c8\ub2e4.</p>
+        {selectedTopic ? (
+          <article className={"topic-detail " + selectedTopic.tone} aria-live="polite">
+            <div className="topic-detail-heading">
+              <div><p className="eyebrow">TODAY'S FOCUS</p><h3>{selectedTopic.label} · {selectedTopic.title}</h3></div>
+              <div className="topic-detail-score"><strong>{selectedTopic.score}</strong><span>점</span></div>
+            </div>
+            <p className="topic-detail-copy">{selectedTopic.detail}</p>
+            <div className="topic-detail-grid">
+              <div><span>오늘 해볼 일</span><p>{selectedTopic.tip}</p></div>
+              <div><span>기억할 점</span><p>{selectedTopic.caution}</p></div>
+            </div>
+          </article>
+        ) : null}
+        <p className="topic-note">각 점수는 정밀한 예측이 아니라, 현재 관심을 기울이는 참고 지표입니다.</p>
       </section>
       <section className="stat-grid">
         <article className="mini-stat"><span>격국</span><strong>{props.result.advanced.geukguk}</strong><small>차트의 기본 구조</small></article>
