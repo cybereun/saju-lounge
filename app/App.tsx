@@ -291,6 +291,126 @@ function copyText(value: string): Promise<void> {
   return Promise.resolve();
 }
 
+function drawWrappedCanvasText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+): number {
+  const characters = [...text];
+  const lines: string[] = [];
+  let line = "";
+
+  for (const character of characters) {
+    const nextLine = `${line}${character}`;
+    if (line && context.measureText(nextLine).width > maxWidth) {
+      lines.push(line);
+      line = character;
+    } else {
+      line = nextLine;
+    }
+  }
+  if (line) lines.push(line);
+
+  const visibleLines = lines.slice(0, maxLines);
+  if (lines.length > maxLines && visibleLines.length > 0) {
+    let lastLine = visibleLines[visibleLines.length - 1];
+    while (context.measureText(`${lastLine}…`).width > maxWidth && lastLine.length > 0) lastLine = lastLine.slice(0, -1);
+    visibleLines[visibleLines.length - 1] = `${lastLine}…`;
+  }
+
+  visibleLines.forEach((visibleLine, index) => context.fillText(visibleLine, x, y + index * lineHeight));
+  return y + visibleLines.length * lineHeight;
+}
+
+function drawCanvasCard(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, fill: string) {
+  context.fillStyle = fill;
+  context.fillRect(x, y, width, height);
+}
+
+async function createTojeongCard(reading: TojeongReading): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1350;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("결과 카드 생성을 지원하지 않는 브라우저입니다.");
+
+  drawCanvasCard(context, 0, 0, canvas.width, canvas.height, "#f7f2eb");
+  drawCanvasCard(context, 0, 0, canvas.width, 335, "#332a43");
+  context.fillStyle = "#f4d59e";
+  context.font = "700 25px 'Malgun Gothic', sans-serif";
+  context.fillText(`SAJU LOUNGE · TOJEONG ${reading.year}`, 72, 78);
+  context.fillStyle = "#fffaf0";
+  context.font = "400 56px 'Batang', 'Malgun Gothic', serif";
+  drawWrappedCanvasText(context, reading.title, 72, 155, 650, 72, 2);
+  context.fillStyle = "#f4d59e";
+  context.font = "700 118px 'Batang', 'Malgun Gothic', serif";
+  context.textAlign = "right";
+  context.fillText(reading.guaCode, 1005, 190);
+  context.fillStyle = "rgba(255, 250, 240, 0.7)";
+  context.font = "700 21px 'Malgun Gothic', sans-serif";
+  context.fillText(`${reading.serialNumber} / 144 괘`, 1005, 235);
+  context.textAlign = "left";
+
+  drawCanvasCard(context, 58, 375, 964, 205, "#ede6ee");
+  context.fillStyle = "#b78643";
+  context.font = "700 20px 'Malgun Gothic', sans-serif";
+  context.fillText("GUA INTERPRETATION", 88, 420);
+  context.fillStyle = "#272b39";
+  context.font = "400 28px 'Malgun Gothic', sans-serif";
+  drawWrappedCanvasText(context, reading.content.overview, 88, 473, 875, 43, 2);
+  context.fillStyle = "#5b476f";
+  context.font = "700 22px 'Malgun Gothic', sans-serif";
+  context.fillText(reading.keywords.map((keyword) => `#${keyword}`).join("  "), 88, 548);
+
+  const themePositions = [
+    [58, 620],
+    [550, 620],
+    [58, 855],
+    [550, 855],
+  ] as const;
+  reading.content.themes.forEach((theme, index) => {
+    const [cardX, cardY] = themePositions[index];
+    const fill = ["#e9e1ed", "#f7ecd5", "#f3e2e5", "#e1ebef"][index];
+    drawCanvasCard(context, cardX, cardY, 472, 195, fill);
+    context.fillStyle = "#817b7b";
+    context.font = "700 18px 'Malgun Gothic', sans-serif";
+    context.fillText(theme.label, cardX + 28, cardY + 38);
+    context.fillStyle = "#272b39";
+    context.font = "700 23px 'Malgun Gothic', sans-serif";
+    drawWrappedCanvasText(context, theme.title, cardX + 28, cardY + 80, 416, 31, 2);
+    context.fillStyle = "#6f6b70";
+    context.font = "400 17px 'Malgun Gothic', sans-serif";
+    drawWrappedCanvasText(context, theme.body, cardX + 28, cardY + 141, 416, 25, 2);
+  });
+
+  context.fillStyle = "#a9a19b";
+  context.font = "400 17px 'Malgun Gothic', sans-serif";
+  context.fillText("사주살롱 · 나를 읽는 조용한 시간", 72, 1240);
+  drawWrappedCanvasText(context, "참고용 콘텐츠이며 중요한 결정을 대신하지 않습니다.", 72, 1280, 900, 25, 1);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("결과 카드 이미지를 만들지 못했습니다."));
+    }, "image/png");
+  });
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function getZodiacInfo(result: SajuResult) {
   const monthDay = result.solar.month * 100 + result.solar.day;
   const zodiac = ZODIAC_INFO.find((item) =>
@@ -834,24 +954,36 @@ function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult
 
 function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; reading: TojeongReading; onEdit: () => void; onBack: () => void; onTargetYearChange: (year: number) => void }) {
   const [shareStatus, setShareStatus] = useState("");
-  const shareText = `사주살롱 토정비결\n${props.reading.year}년 · ${props.reading.title}\n${props.reading.summary}`;
 
-  async function handleShare() {
+  async function handleCardSave() {
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "사주살롱 토정비결", text: shareText });
-      } else {
-        await copyText(shareText);
-      }
-      setShareStatus("토정비결을 공유할 준비가 되었습니다.");
+      const blob = await createTojeongCard(props.reading);
+      downloadBlob(blob, `saju-lounge-tojeong-${props.reading.year}-${props.reading.guaCode}.png`);
+      setShareStatus("토정비결 결과 카드를 저장했습니다.");
     } catch {
-      setShareStatus("공유를 취소했거나 브라우저가 지원하지 않습니다.");
+      setShareStatus("결과 카드 저장에 실패했습니다.");
+    }
+  }
+
+  async function handleCardShare() {
+    try {
+      const blob = await createTojeongCard(props.reading);
+      const file = new File([blob], `saju-lounge-tojeong-${props.reading.year}-${props.reading.guaCode}.png`, { type: "image/png" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: "사주살롱 토정비결", text: `${props.reading.year}년 토정비결 ${props.reading.guaCode}괘`, files: [file] });
+        setShareStatus("결과 카드를 공유했습니다.");
+      } else {
+        downloadBlob(blob, file.name);
+        setShareStatus("이 브라우저는 이미지 공유를 지원하지 않아 카드를 저장했습니다.");
+      }
+    } catch {
+      setShareStatus("카드 공유를 취소했거나 브라우저가 지원하지 않습니다.");
     }
   }
 
   return (
     <div className="result-page">
-      <div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><label className="tojeong-year-control"><span>풀이 연도</span><select value={props.reading.year} onChange={(event) => props.onTargetYearChange(Number(event.target.value))}>{Array.from({ length: 7 }, (_, index) => props.result.currentYear - 2 + index).map((year) => <option value={year} key={year}>{year}년</option>)}</select></label><button className="secondary-button" type="button" onClick={props.onEdit}>프로필 수정</button><button className="primary-button small-button" type="button" onClick={handleShare}>결과 공유</button></div></div>
+      <div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><label className="tojeong-year-control"><span>풀이 연도</span><select value={props.reading.year} onChange={(event) => props.onTargetYearChange(Number(event.target.value))}>{Array.from({ length: 7 }, (_, index) => props.result.currentYear - 2 + index).map((year) => <option value={year} key={year}>{year}년</option>)}</select></label><button className="secondary-button" type="button" onClick={props.onEdit}>프로필 수정</button><button className="secondary-button" type="button" onClick={handleCardSave}>카드 저장</button><button className="primary-button small-button" type="button" onClick={handleCardShare}>카드 공유</button></div></div>
       {shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}
       <section className="tojeong-hero">
         <div><p className="eyebrow">YEARLY GUIDE · {props.reading.year} · {props.reading.calculation.targetYearGanji}</p><h1>{props.reading.title}</h1><p>{profileLabel(props.profile)} · 전통 144괘 작괘 결과를 확인해보세요.</p></div>
