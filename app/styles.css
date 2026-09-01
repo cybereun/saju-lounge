@@ -187,6 +187,21 @@ input::placeholder { color: #b8b3af; }
 .element-note p { margin: 10px 0 0; color: var(--muted); font-size: 0.75rem; line-height: 1.7; }
 .element-note b { color: var(--plum); }
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+.topic-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.topic-card { min-height: 205px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 17px; padding: 19px; background: rgba(255, 253, 249, 0.72); }
+.topic-card.rose { background: #f3e2e5; }
+.topic-card.gold { background: #f7ecd5; }
+.topic-card.plum { background: #e9e1ed; }
+.topic-card.blue { background: #e1ebef; }
+.topic-card-top { display: flex; align-items: center; gap: 9px; }
+.topic-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.5); color: var(--plum); font-family: var(--serif); font-size: 1.1rem; }
+.topic-label { color: #928b8b; font-size: 0.67rem; }
+.topic-card-top strong { margin-left: auto; color: var(--plum); font-family: var(--serif); font-size: 1.35rem; font-weight: 400; }
+.topic-card h3 { margin: 18px 0 9px; font-size: 1rem; letter-spacing: -0.05em; }
+.topic-card p { min-height: 55px; margin-bottom: 16px; color: #817b7b; font-size: 0.71rem; line-height: 1.65; }
+.topic-track { height: 6px; overflow: hidden; margin-top: auto; border-radius: 99px; background: rgba(255, 255, 255, 0.55); }
+.topic-track i { display: block; height: 100%; border-radius: inherit; background: var(--plum); opacity: 0.72; }
+.topic-note { margin: 13px 2px 0; color: #aaa4a0; font-size: 0.64rem; }
 .mini-stat { border: 1px solid var(--line); border-radius: 15px; padding: 17px; background: rgba(255, 253, 249, 0.65); }
 .mini-stat span { display: block; color: #9b9592; font-size: 0.65rem; }
 .mini-stat strong { display: block; overflow: hidden; margin: 9px 0 4px; color: var(--plum); font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -286,6 +301,7 @@ input::placeholder { color: #b8b3af; }
   .hero-section { grid-template-columns: 1fr 0.8fr; padding-left: 0; padding-right: 0; }
   .hero-art { min-height: 310px; transform: scale(0.88); }
   .service-grid { grid-template-columns: repeat(2, 1fr); }
+  .topic-grid { grid-template-columns: repeat(2, 1fr); }
   .pillar-grid { grid-template-columns: repeat(2, 1fr); }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .forecast-grid { grid-template-columns: 1fr; }
@@ -337,6 +353,7 @@ input::placeholder { color: #b8b3af; }
   .daily-controls label { max-width: none; width: 100%; }
   .keyword-chip { margin-bottom: 0; }
   .daily-cards, .compat-axis-grid, .zodiac-duo { grid-template-columns: 1fr; }
+  .topic-grid { grid-template-columns: 1fr; }
   .daily-card { min-height: 0; }
   .daily-reflection, .strength-section, .zodiac-message { margin-top: 38px; padding: 26px 22px; }
   .daily-reflection h2, .strength-section h2, .zodiac-message h2 { font-size: 1.85rem; }

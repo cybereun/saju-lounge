@@ -49,6 +49,15 @@ type CompatibilityReading = {
 };
 
 const PROFILE_STORAGE_KEY = "saju-lounge-profile-v1";
+type TopicReading = {
+  id: string;
+  icon: string;
+  label: string;
+  title: string;
+  body: string;
+  score: number;
+  tone: string;
+};
 
 const SERVICES: ServiceCard[] = [
   {
@@ -339,6 +348,51 @@ function buildCompatibilityReading(first: SajuResult, second: SajuResult): Compa
   };
 }
 
+function buildTopicReadings(result: SajuResult): TopicReading[] {
+  const element = leadingElement(result);
+  const strength = result.advanced.dayStrength.strength;
+  const base = result.pillarDetails.day.stemIdx + result.pillarDetails.day.branchIdx;
+  const score = (start: number, spread: number) => clamp(start + (base % spread), 58, 94);
+
+  return [
+    {
+      id: "love",
+      icon: "\u2661",
+      label: "\uc5f0\uc560",
+      title: strength === "strong" ? "\ub9c8\uc74c\uc744 \uc194\uc9c1\ud558\uac8c \ubcf4\uc5ec\uc904\uc218\ub85d \uac00\uae4c\uc6cc\uc838\uc694" : "\uc791\uc740 \uc548\ubd80\uc5d0\uc11c \uc2dc\uc791\ud558\ub294 \uad00\uacc4",
+      body: strength === "strong" ? "\ub610\ub837\ud55c \ud45c\ud604\ubcf4\ub2e4 \uc0c1\ub300\uc758 \ub9ac\ub4ec\uc744 \ud568\uaed8 \ubcf4\uba74 \uad00\uacc4\uc758 \uc628\ub3c4\uac00 \ub192\uc544\uc838\uc694." : "\uc11c\ub450\ub974\uc9c0 \uc54a\uc740 \ub300\ud654\uc640 \uc791\uc740 \ud45c\ud604\uc774 \uc2e0\ub8b0\ub97c \ud0a4\uc6cc\uc694.",
+      score: score(72, 22),
+      tone: "rose",
+    },
+    {
+      id: "money",
+      icon: "\u25c7",
+      label: "\uc7ac\ubb3c",
+      title: "\ud070 \uacb0\uc815\ubcf4\ub2e4 \uc791\uc740 \uc2b5\uad00\uc774 \uc6b4\uc744 \ub9cc\ub4e4\uc5b4\uc694",
+      body: element + " \uae30\uc6b4\uc758 \uc7a5\uc810\uc744 \uc0b4\ub9ac\ub294 \ud558\ub8e8\uc608\uc694. \ud558\ub8e8 \ud558\ub098\uc758 \uc9c0\ucd9c\uacfc \ubaa9\ud45c\ub97c \uae30\ub85d\ud574\ubcf4\uc138\uc694.",
+      score: score(68, 25),
+      tone: "gold",
+    },
+    {
+      id: "work",
+      icon: "\u25c7",
+      label: "\uc9c1\uc5c5",
+      title: strength === "weak" ? "\ud63c\uc790 \ubc00\uc5b4\ubd99\uae30\ubcf4\ub2e4 \uc5f0\uacb0\uc5d0\uc11c \ud798\uc774 \uc0dd\uaca8\uc694" : "\ubc29\ud5a5\uc744 \ubd84\uba85\ud788 \ud558\uba74 \ucd94\uc9c4\ub825\uc774 \uc0dd\uae30\uc5d0\uc694",
+      body: strength === "weak" ? "\ud544\uc694\ud55c \ub3c4\uc6c0\uc744 \uc694\uccad\ud558\uace0 \uc5ed\ud560\uc744 \ub098\ub204\ub294 \uac83\uc774 \uc2e4\ub825\uc744 \ub9cc\ub4e4\uc5b4\uc694." : "\uc911\uc2ec \uac00\uce58\ub97c \uba3c\uc800 \uc815\ud558\uba74 \uc624\ub298\uc758 \uc77c\uc774 \uc120\uba85\ud574\uc838\uc694.",
+      score: score(70, 24),
+      tone: "plum",
+    },
+    {
+      id: "health",
+      icon: "\u2022",
+      label: "\uac74\uac15",
+      title: "\ub9ac\ub4ec\uc744 \uc9c0\ud0a4\ub294 \uac83\uc774 \uac00\uc7a5 \uc911\uc694\ud574\uc694",
+      body: "\ubab8\uc758 \uc2e0\ud638\ub97c \uacb0\uacfc\ubcf4\ub2e4 \uba3c\uc800 \ub4e4\uc5b4\ubcf4\uc138\uc694. \uc7a0\uacfc \uc2dd\uc0ac\uc758 \ub9ac\ub4ec\uc744 \uc791\uac8c\ub77c\ub3c4 \ubc18\ubcf5\ud574\ubcf4\uc138\uc694.",
+      score: score(74, 19),
+      tone: "blue",
+    },
+  ];
+}
 function PageIntro(props: { eyebrow: string; title: string; description: string; onBack: () => void }) {
   return (
     <div className="page-intro">
@@ -550,6 +604,7 @@ function SajuResultView(props: { result: SajuResult; profile: BirthProfile; onEd
   const [shareStatus, setShareStatus] = useState("");
   const currentDaeun = props.result.daeun.current;
   const currentSeyun = props.result.seyun.find((item) => item.year === props.result.currentYear);
+  const topicReadings = buildTopicReadings(props.result);
   const resultShareText = `사주살롱\n${resultDateLabel(props.result)} · ${props.result.pillars.year} ${props.result.pillars.month} ${props.result.pillars.day} ${props.result.pillars.hour}\n일주: ${props.result.pillars.day}\n${props.result.advanced.interpretation}`;
 
   async function handleShare() {
@@ -596,6 +651,20 @@ function SajuResultView(props: { result: SajuResult; profile: BirthProfile; onEd
         <div className="element-card"><div className="element-bars">{ELEMENT_ORDER.map((element) => { const count = props.result.fiveElements[element] || 0; return <div className="element-row" key={element}><span>{element}</span><div className="element-track"><i className={`element-fill element-${element}`} style={{ width: `${Math.max(8, count * 12)}%` }} /></div><strong>{count}</strong></div>; })}</div><div className="element-note"><span>오늘의 힌트</span><p><b>{leadingElement(props.result)}</b> 기운이 가장 선명합니다. 이 기운의 장점을 살리는 선택부터 시도해보세요.</p></div></div>
       </section>
 
+<section className="content-section topic-section">
+        <SectionTitle eyebrow="FOUR DIRECTIONS" title="\uc9c0\uae08 \uad81\uae08\ud55c \uc8fc\uc81c\ub97c \uace8\ub77c\ubcf4\uc138\uc694" />
+        <div className="topic-grid">
+          {topicReadings.map((topic) => (
+            <article className={"topic-card " + topic.tone} key={topic.id}>
+              <div className="topic-card-top"><span className="topic-icon">{topic.icon}</span><span className="topic-label">{topic.label}</span><strong>{topic.score}</strong></div>
+              <h3>{topic.title}</h3>
+              <p>{topic.body}</p>
+              <div className="topic-track" aria-label={topic.label + " " + topic.score + "\uc810"}><i style={{ width: topic.score + "%" }} /></div>
+            </article>
+          ))}
+        </div>
+        <p className="topic-note">\uac01 \uc810\uc218\ub294 \uc815\ubc00\ud55c \uc608\uce21\uc774 \uc544\ub2c8\ub77c, \ud604\uc7ac \uad00\uc2ec\uc744 \uae30\uc6b8\uc774\ub294 \ucc38\uace0 \uc9c0\ud45c\uc785\ub2c8\ub2e4.</p>
+      </section>
       <section className="stat-grid">
         <article className="mini-stat"><span>격국</span><strong>{props.result.advanced.geukguk}</strong><small>차트의 기본 구조</small></article>
         <article className="mini-stat"><span>용신</span><strong>{props.result.advanced.yongsin.join(" · ") || "-"}</strong><small>보완하면 좋은 기운</small></article>
