@@ -1,0 +1,28 @@
+{
+  "name": "사주살롱 · 나를 읽는 시간",
+  "short_name": "사주살롱",
+  "description": "사주, 오늘의 운세, 궁합, 별자리, 토정비결을 한곳에서 만나는 무료 모바일 서비스",
+  "lang": "ko-KR",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f7f2eb",
+  "theme_color": "#332a43",
+  "categories": ["lifestyle", "entertainment"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

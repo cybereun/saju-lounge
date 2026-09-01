@@ -37,6 +37,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .header-nav button { border: 0; padding: 8px 0; background: transparent; color: #8a8890; font-size: 0.84rem; font-weight: 600; }
 .header-nav button.active { color: var(--ink); }
 .header-cta { border: 1px solid var(--line); border-radius: 999px; padding: 10px 17px; background: rgba(255, 253, 249, 0.65); color: var(--ink); font-size: 0.78rem; font-weight: 700; }
+.install-button { border: 1px solid rgba(91, 71, 111, 0.25); border-radius: 999px; padding: 9px 13px; background: #ede6ee; color: var(--plum); font-size: 0.72rem; font-weight: 700; }
 
 main { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
 .eyebrow { margin: 0 0 11px; color: var(--gold); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.17em; }
@@ -344,6 +345,14 @@ input::placeholder { color: #b8b3af; }
 .site-footer strong { color: var(--ink); font-size: 0.8rem; }
 .site-footer span, .site-footer p { margin: 0; color: #aaa4a0; font-size: 0.65rem; }
 
+.install-banner { position: fixed; z-index: 10; right: 20px; bottom: 20px; left: 20px; width: min(520px, calc(100% - 40px)); display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 0 auto; border: 1px solid rgba(91, 71, 111, 0.18); border-radius: 18px; padding: 15px 17px; background: rgba(255, 253, 249, 0.97); box-shadow: 0 18px 45px rgba(51, 42, 67, 0.18); }
+.install-banner > div:first-child { display: flex; align-items: center; gap: 11px; }
+.install-banner-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%; background: var(--plum-dark); color: #f9ebcf; font-family: var(--serif); font-size: 1.2rem; }
+.install-banner strong { display: block; color: var(--ink); font-size: 0.78rem; }
+.install-banner p { margin: 4px 0 0; color: var(--muted); font-size: 0.66rem; }
+.install-banner-actions { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
+.install-dismiss { border: 0; padding: 4px; background: transparent; color: #aaa4a0; font-size: 1.2rem; line-height: 1; }
+
 @media (max-width: 900px) {
   .hero-section { grid-template-columns: 1fr 0.8fr; padding-left: 0; padding-right: 0; }
   .hero-art { min-height: 310px; transform: scale(0.88); }
@@ -360,6 +369,7 @@ input::placeholder { color: #b8b3af; }
   .site-header { height: 72px; }
   .header-nav { display: none; }
   .header-cta { padding: 9px 13px; }
+  .install-button { padding: 8px 10px; font-size: 0.65rem; }
   .hero-section { display: flex; flex-direction: column; align-items: stretch; gap: 13px; min-height: 0; padding: 50px 0 58px; }
   .hero-copy { order: 1; }
   .hero-art { order: 2; min-height: 250px; margin-top: -8px; transform: scale(0.77); }
@@ -425,5 +435,7 @@ input::placeholder { color: #b8b3af; }
   .tojeong-overview { align-items: start; flex-direction: column; padding: 22px; }
   .tojeong-keywords { justify-content: start; min-width: 0; }
   .tojeong-calculation-grid, .tojeong-theme-grid, .tojeong-month-grid { grid-template-columns: 1fr; }
+  .install-banner { right: 14px; bottom: 14px; left: 14px; width: calc(100% - 28px); align-items: stretch; flex-direction: column; gap: 12px; }
+  .install-banner-actions { justify-content: flex-end; }
   .site-footer { align-items: start; flex-direction: column; gap: 10px; }
 }

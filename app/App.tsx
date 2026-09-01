@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { calculateSaju } from "../src/calculate.ts";
 import { calculateTojeong, type TojeongCalculation } from "../src/tojeong.ts";
@@ -49,6 +49,11 @@ type CompatibilityReading = {
   axes: Array<{ label: string; value: number; body: string }>;
   strengths: string[];
   caution: string;
+};
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
 type TojeongReading = {
@@ -840,7 +845,16 @@ function ProfileForm(props: {
   );
 }
 
-function Header(props: { view: View; hasProfile: boolean; onHome: () => void; onSaved: () => void }) {
+function InstallBanner(props: { onInstall: () => void; onDismiss: () => void }) {
+  return (
+    <aside className="install-banner" role="status">
+      <div><span className="install-banner-icon" aria-hidden="true">⌂</span><div><strong>사주살롱을 홈 화면에 저장하세요</strong><p>다음에는 브라우저를 열지 않고 바로 만날 수 있어요.</p></div></div>
+      <div className="install-banner-actions"><button className="primary-button small-button" type="button" onClick={props.onInstall}>앱 설치</button><button className="install-dismiss" type="button" onClick={props.onDismiss} aria-label="앱 설치 안내 닫기">×</button></div>
+    </aside>
+  );
+}
+
+function Header(props: { view: View; hasProfile: boolean; installAvailable: boolean; onHome: () => void; onSaved: () => void; onInstall: () => void }) {
   return (
     <header className="site-header">
       <button className="brand" type="button" onClick={props.onHome} aria-label="사주살롱 홈">
@@ -854,6 +868,7 @@ function Header(props: { view: View; hasProfile: boolean; onHome: () => void; on
         <button className={props.view === "home" ? "active" : ""} type="button" onClick={props.onHome}>홈</button>
         <button className={props.hasProfile && props.view === "saju" ? "active" : ""} type="button" onClick={props.onSaved} disabled={!props.hasProfile}>내 결과</button>
       </nav>
+      {props.installAvailable ? <button className="install-button" type="button" onClick={props.onInstall}>앱 설치</button> : null}
       <button className="header-cta" type="button" onClick={props.hasProfile ? props.onSaved : props.onHome}>
         {props.hasProfile ? "내 사주" : "시작하기"}
       </button>
@@ -1315,6 +1330,41 @@ export function App() {
   const [savedProfile, setSavedProfile] = useState<BirthProfile | null>(() => loadStoredProfile());
   const [savedResult, setSavedResult] = useState<SajuResult | null>(() => safeCalculateProfile(loadStoredProfile()));
   const [view, setView] = useState<View>("home");
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installBannerVisible, setInstallBannerVisible] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia("(display-mode: standalone)").matches) return;
+
+    function handleBeforeInstallPrompt(event: Event) {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+      setInstallBannerVisible(true);
+    }
+
+    function handleAppInstalled() {
+      setInstallPrompt(null);
+      setInstallBannerVisible(false);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  async function handleInstall() {
+    if (!installPrompt) return;
+    try {
+      await installPrompt.prompt();
+      await installPrompt.userChoice;
+    } finally {
+      setInstallPrompt(null);
+      setInstallBannerVisible(false);
+    }
+  }
 
   function openView(nextView: View) {
     setView(nextView);
@@ -1335,5 +1385,5 @@ export function App() {
   if (view === "compatibility") content = <CompatibilityScreen initialProfile={savedProfile} onSaved={handleSaved} onBack={() => openView("home")} />;
   if (view === "zodiac") content = <ZodiacScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
 
-  return <div className="app"><Header view={view} hasProfile={Boolean(savedProfile && savedResult)} onHome={() => openView("home")} onSaved={() => openView("saju")} /><main>{content}</main><Footer /></div>;
+  return <div className="app"><Header view={view} hasProfile={Boolean(savedProfile && savedResult)} installAvailable={Boolean(installPrompt)} onHome={() => openView("home")} onSaved={() => openView("saju")} onInstall={handleInstall} /><main>{content}</main>{installPrompt && installBannerVisible ? <InstallBanner onInstall={handleInstall} onDismiss={() => setInstallBannerVisible(false)} /> : null}<Footer /></div>;
 }

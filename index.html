@@ -3,15 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1f2638" />
+    <meta name="theme-color" content="#332a43" />
+    <meta name="application-name" content="사주살롱" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="사주살롱" />
+    <meta name="robots" content="index, follow" />
+    <meta name="keywords" content="사주, 사주분석, 오늘의 운세, 궁합, 별자리, 토정비결, 무료 운세" />
     <meta
       name="description"
-      content="사주, 오늘의 운세, 궁합, 별자리를 한곳에서 가볍게 만나보는 모바일 운세 서비스"
+      content="회원가입 없이 무료로 보는 사주분석, 오늘의 운세, 궁합, 별자리, 토정비결. 모바일에 맞춘 사주살롱에서 나만의 흐름을 확인해보세요."
     />
-    <title>사주살롱 · 나를 읽는 시간</title>
+    <link rel="canonical" href="https://saju-lounge.vercel.app/" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:site_name" content="사주살롱" />
+    <meta property="og:title" content="사주살롱 · 무료 사주와 운세 서비스" />
+    <meta property="og:description" content="사주분석, 오늘의 운세, 궁합, 별자리, 토정비결을 한곳에서 가볍게 만나보세요." />
+    <meta property="og:url" content="https://saju-lounge.vercel.app/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="사주살롱 · 무료 사주와 운세 서비스" />
+    <meta name="twitter:description" content="회원가입 없이 시작하는 모바일 중심 운세 서비스" />
+    <title>사주살롱 | 무료 사주분석·오늘의 운세·궁합·별자리·토정비결</title>
   </head>
   <body>
     <div id="root"></div>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "사주살롱",
+        "url": "https://saju-lounge.vercel.app/",
+        "description": "회원가입 없이 무료로 이용하는 모바일 중심 사주·운세 서비스",
+        "applicationCategory": "LifestyleApplication",
+        "operatingSystem": "Any",
+        "inLanguage": "ko-KR",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "KRW" }
+      }
+    </script>
     <script type="module" src="/app/main.tsx"></script>
   </body>
 </html>
