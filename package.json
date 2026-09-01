@@ -54,7 +54,7 @@
     "typecheck": "npm run typecheck:lib && npm run typecheck:app",
     "typecheck:lib": "tsc --noEmit -p tsconfig.types.json",
     "typecheck:app": "tsc --noEmit -p tsconfig.app.json",
-    "test": "tsx --test tests/calculateSaju.test.ts"
+    "test": "tsx --test tests/calculateSaju.test.ts tests/tojeong.test.ts"
   },
   "dependencies": {
     "react": "^19.2.3",

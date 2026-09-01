@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { calculateSaju } from "../src/calculate.ts";
+import { calculateTojeong, type TojeongCalculation } from "../src/tojeong.ts";
+import { solarToLunar } from "../src/manse.ts";
 import type { CalendarType, Gender, PillarKey, SajuInput, SajuResult } from "../src/types.ts";
 
 type View = "home" | "saju" | "daily" | "compatibility" | "zodiac" | "tojeong";
@@ -50,12 +52,17 @@ type CompatibilityReading = {
 
 type TojeongReading = {
   year: number;
-  score: number;
+  guaCode: string;
+  serialNumber: number;
+  koreanAge: number;
+  lunarBirth: { year: number; month: number; day: number };
+  calculation: TojeongCalculation;
+  gua: TojeongCalculation["gua"];
   title: string;
   summary: string;
   keywords: string[];
   themes: Array<{ label: string; title: string; body: string; tone: string }>;
-  months: Array<{ month: number; name: string; phase: string; body: string; score: number }>;
+  months: Array<{ month: number; name: string; phase: string; body: string }>;
   caution: string;
 };
 
@@ -331,58 +338,72 @@ function buildDailyReading(result: SajuResult, date: string): DailyReading {
 }
 
 function buildTojeongReading(result: SajuResult): TojeongReading {
-  const year = result.currentYear;
+  const lunarBirth = solarToLunar(result.normalized.solar.year, result.normalized.solar.month, result.normalized.solar.day);
+  const calculation = calculateTojeong({
+    lunarBirthYear: lunarBirth.year,
+    lunarBirthMonth: lunarBirth.month,
+    lunarBirthDay: lunarBirth.day,
+    targetYear: result.currentYear,
+  });
+  const { upper, middle, lower } = calculation.gua;
   const element = leadingElement(result);
-  const seed = result.input.year + result.input.month * 7 + result.input.day * 13 + result.pillarDetails.day.stemIdx * 17 + result.pillarDetails.day.branchIdx * 5 + year;
-  const score = clamp(67 + (seed % 25), 58, 94);
-  const title = score >= 84 ? "움직인 만큼 길이 열리는 한 해" : score >= 74 ? "차분한 준비가 기회를 부르는 한 해" : "속도를 조절하며 내실을 다지는 한 해";
+  const phaseNames = ["시작", "전개", "정리"];
+  const phaseBodies = [
+    "작게 시작하고 방향을 확인하는 달입니다.",
+    "사람과 기회를 연결하며 흐름을 넓혀보세요.",
+    "속도를 조절하고 다음 계절을 준비해보세요.",
+  ];
   const months = result.wolun.map((item) => {
-    const monthScore = clamp(61 + ((seed + item.month * 11) % 31), 55, 94);
-    const phase = monthScore >= 82 ? "확장" : monthScore >= 70 ? "전환" : "정리";
+    const phaseIndex = (item.month + lower.number - 2) % phaseNames.length;
+    const phase = phaseNames[phaseIndex];
     const name = item.monthName || item.month_name || `${item.month}월`;
     return {
       month: item.month,
       name,
       phase,
-      score: monthScore,
-      body: `${item.ganzhi}의 기운이 만나는 달입니다. ${phase === "확장" ? "사람과 기회를 넓혀보세요." : phase === "전환" ? "하던 방식을 조금 바꿔보세요." : "속도를 늦추고 기반을 다져보세요."}`,
+      body: `${item.ganzhi}의 기운이 만나는 달입니다. ${phaseBodies[phaseIndex]}`,
     };
   });
 
   return {
-    year,
-    score,
-    title,
-    summary: `${year}년은 ${element} 기운의 장점을 생활 속 선택으로 옮길수록 흐름이 선명해지는 해예요. 한 번에 크게 바꾸기보다 계절마다 한 가지씩 방향을 조정해보세요.`,
-    keywords: score >= 84 ? ["확장", "표현", "기회"] : score >= 74 ? ["준비", "연결", "균형"] : ["정리", "회복", "기초"],
+    year: calculation.targetYear,
+    guaCode: calculation.guaCode,
+    serialNumber: calculation.serialNumber,
+    koreanAge: calculation.koreanAge,
+    lunarBirth: calculation.lunarBirth,
+    calculation,
+    gua: calculation.gua,
+    title: `${upper.name}의 큰 흐름, ${lower.name}으로 마무리하는 한 해`,
+    summary: `${calculation.targetYear}년 ${calculation.targetYearGanji}년의 토정비결 괘는 ${calculation.guaCode}입니다. ${upper.hanja}(${upper.name})의 큰 방향과 ${middle.name}의 과정, ${lower.name}의 마무리를 함께 살펴보세요. ${element} 기운을 생활 속 선택에 천천히 연결하면 올해의 흐름을 더 선명하게 읽을 수 있습니다.`,
+    keywords: [`${upper.hanja} ${upper.name}`, middle.name, lower.name],
     themes: [
       {
-        label: "큰 흐름",
-        title: score >= 78 ? "작은 움직임이 다음 문을 엽니다" : "비워낸 자리에 새 흐름이 들어옵니다",
-        body: "올해는 결과를 서둘러 확정하기보다, 계속 이어갈 수 있는 방향을 고르는 일이 중요해요.",
+        label: `上卦 ${upper.number} · ${upper.hanja}`,
+        title: `${upper.name}처럼 큰 방향을 세워보세요`,
+        body: "올해의 큰 흐름은 지금 당장 모든 답을 정하기보다, 끝까지 가져갈 방향을 고르는 데서 시작됩니다.",
         tone: "plum",
       },
       {
-        label: "재물 운",
-        title: "관리하는 습관이 가장 오래 남아요",
-        body: "수입과 지출을 한눈에 보는 간단한 기준을 만들면 좋은 기회를 알아보는 감각도 함께 자랍니다.",
+        label: `中卦 ${middle.number}`,
+        title: `${middle.name}의 리듬을 지켜보세요`,
+        body: "중괘는 한 해의 허리처럼 과정의 리듬을 보여줍니다. 계획을 한 번에 밀어붙이기보다 단계별로 점검해보세요.",
         tone: "gold",
       },
       {
-        label: "일과 관계",
-        title: "혼자보다 함께할 때 속도가 맞춰져요",
-        body: "나의 역할을 분명히 말하고 상대의 속도도 존중하면 일과 관계의 피로가 한결 가벼워집니다.",
+        label: `下卦 ${lower.number}`,
+        title: `${lower.name}에 필요한 선택을 남겨두세요`,
+        body: "마지막 흐름은 결론을 서두르기보다, 중요한 관계와 생활의 기준을 지키는 쪽으로 힘을 모아보라는 신호입니다.",
         tone: "rose",
       },
       {
         label: "올해의 실천",
-        title: "계절마다 한 가지씩 정리하기",
-        body: "해야 할 일을 늘리기보다 지금의 생활에서 덜어낼 한 가지를 정하면 운의 방향이 선명해져요.",
+        title: "괘를 정답보다 질문으로 사용하기",
+        body: "144괘의 숫자는 한 해를 돌아보는 프레임입니다. 마음에 닿는 문장을 골라 실제 선택과 습관으로 옮겨보세요.",
         tone: "blue",
       },
     ],
     months,
-    caution: "토정비결은 전통 운세 형식을 바탕으로 만든 자기이해용 참고 콘텐츠이며, 중요한 결정을 대신하지 않습니다.",
+    caution: "정통 작괘법(세는나이·음력 생월·생일·태세수·월건수·일진수)을 기준으로 계산한 참고 콘텐츠입니다. 판본별 수치표와 해석이 다를 수 있으며, 중요한 결정을 대신하지 않습니다.",
   };
 }
 
@@ -862,15 +883,16 @@ function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; r
       <div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>프로필 수정</button><button className="primary-button small-button" type="button" onClick={handleShare}>결과 공유</button></div></div>
       {shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}
       <section className="tojeong-hero">
-        <div><p className="eyebrow">YEARLY GUIDE · {props.reading.year}</p><h1>{props.reading.title}</h1><p>{profileLabel(props.profile)} · 한 해의 큰 흐름을 살펴보세요.</p></div>
-        <div className="tojeong-score"><span>올해의 흐름</span><strong>{props.reading.score}</strong><small>점</small></div>
+        <div><p className="eyebrow">YEARLY GUIDE · {props.reading.year} · {props.reading.calculation.targetYearGanji}</p><h1>{props.reading.title}</h1><p>{profileLabel(props.profile)} · 전통 144괘 작괘 결과를 확인해보세요.</p></div>
+        <div className="tojeong-score"><span>정통 작괘 코드</span><strong>{props.reading.guaCode}</strong><small>{props.reading.serialNumber} / 144</small></div>
       </section>
       <section className="tojeong-overview">
         <div><p className="eyebrow">TOJEONG BIG PICTURE</p><h2>{props.reading.year}년, 나의 흐름을 읽는 법</h2><p>{props.reading.summary}</p></div>
         <div className="tojeong-keywords">{props.reading.keywords.map((keyword) => <span key={keyword}>#{keyword}</span>)}</div>
       </section>
+      <section className="tojeong-calculation content-section"><SectionTitle eyebrow="TRADITIONAL CALCULATION" title="144괘가 만들어진 과정" /><div className="tojeong-calculation-grid"><article><span>상괘 · {props.reading.gua.upper.hanja} {props.reading.gua.upper.name}</span><strong>{props.reading.calculation.formulas.upper}</strong><p>세는나이 {props.reading.koreanAge}세 + 태세수 {props.reading.calculation.numbers.taese}</p></article><article><span>중괘 · {props.reading.gua.middle.number} {props.reading.gua.middle.name}</span><strong>{props.reading.calculation.formulas.middle}</strong><p>{props.reading.year}년 음력 {props.reading.lunarBirth.month}월은 {props.reading.calculation.monthDays}일 · 월건 {props.reading.calculation.targetMonthGanji}</p></article><article><span>하괘 · {props.reading.gua.lower.number} {props.reading.gua.lower.name}</span><strong>{props.reading.calculation.formulas.lower}</strong><p>음력 생일 {props.reading.lunarBirth.day}일 + 일진 {props.reading.calculation.targetDayGanji}</p></article></div><p className="tojeong-calculation-note">음력 출생일을 기준으로 하며, 윤달은 해당 월의 평달로 계산합니다. 나머지가 0이면 각각 8·6·3으로 표시합니다.</p></section>
       <section className="content-section"><SectionTitle eyebrow="YEARLY THEMES" title="올해의 네 가지 장면" /><div className="tojeong-theme-grid">{props.reading.themes.map((theme) => <article className={`tojeong-theme ${theme.tone}`} key={theme.label}><span>{theme.label}</span><h3>{theme.title}</h3><p>{theme.body}</p></article>)}</div></section>
-      <section className="content-section"><SectionTitle eyebrow="MONTH BY MONTH" title="달마다 달라지는 흐름" /><div className="tojeong-month-grid">{props.reading.months.map((month) => <article className="tojeong-month" key={month.month}><div className="tojeong-month-top"><span>{month.name}</span><strong>{month.score}</strong></div><div className="tojeong-month-track"><i style={{ width: `${month.score}%` }} /></div><b>{month.phase}</b><p>{month.body}</p></article>)}</div></section>
+      <section className="content-section"><SectionTitle eyebrow="MONTH BY MONTH" title="달마다 달라지는 흐름" /><div className="tojeong-month-grid">{props.reading.months.map((month) => <article className="tojeong-month" key={month.month}><div className="tojeong-month-top"><span>{month.name}</span><strong>{String(month.month).padStart(2, "0")}</strong></div><b>{month.phase}</b><p>{month.body}</p></article>)}</div></section>
       <p className="disclaimer">{props.reading.caution}</p>
     </div>
   );

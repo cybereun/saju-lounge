@@ -263,6 +263,13 @@ input::placeholder { color: #b8b3af; }
 .tojeong-overview p:last-child { max-width: 670px; margin-bottom: 0; color: #817687; font-size: 0.78rem; line-height: 1.8; }
 .tojeong-keywords { display: flex; flex-wrap: wrap; justify-content: end; gap: 6px; min-width: 190px; }
 .tojeong-keywords span { border-radius: 99px; padding: 7px 10px; background: rgba(255, 255, 255, 0.55); color: var(--plum); font-size: 0.68rem; }
+.tojeong-calculation { margin-top: 34px; }
+.tojeong-calculation-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tojeong-calculation-grid article { min-height: 150px; border: 1px solid var(--line); border-radius: 17px; padding: 20px; background: rgba(255, 253, 249, 0.72); }
+.tojeong-calculation-grid span { color: #90868e; font-size: 0.68rem; font-weight: 700; }
+.tojeong-calculation-grid strong { display: block; margin: 17px 0 10px; color: var(--plum); font-family: var(--serif); font-size: 1.1rem; font-weight: 400; }
+.tojeong-calculation-grid p { margin-bottom: 0; color: var(--muted); font-size: 0.7rem; line-height: 1.65; }
+.tojeong-calculation-note { margin: 12px 2px 0; color: var(--muted); font-size: 0.7rem; line-height: 1.7; }
 .tojeong-theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .tojeong-theme { min-height: 190px; border: 1px solid var(--line); border-radius: 17px; padding: 20px; background: rgba(255, 253, 249, 0.72); }
 .tojeong-theme.plum { background: #e9e1ed; }.tojeong-theme.gold { background: #f7ecd5; }.tojeong-theme.rose { background: #f3e2e5; }.tojeong-theme.blue { background: #e1ebef; }
@@ -342,7 +349,7 @@ input::placeholder { color: #b8b3af; }
   .pillar-grid { grid-template-columns: repeat(2, 1fr); }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .forecast-grid { grid-template-columns: 1fr; }
-  .tojeong-theme-grid, .tojeong-month-grid { grid-template-columns: repeat(2, 1fr); }
+  .tojeong-calculation-grid, .tojeong-theme-grid, .tojeong-month-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 680px) {
@@ -412,6 +419,6 @@ input::placeholder { color: #b8b3af; }
   .zodiac-orb { width: 115px; height: 115px; }
   .tojeong-overview { align-items: start; flex-direction: column; padding: 22px; }
   .tojeong-keywords { justify-content: start; min-width: 0; }
-  .tojeong-theme-grid, .tojeong-month-grid { grid-template-columns: 1fr; }
+  .tojeong-calculation-grid, .tojeong-theme-grid, .tojeong-month-grid { grid-template-columns: 1fr; }
   .site-footer { align-items: start; flex-direction: column; gap: 10px; }
 }
