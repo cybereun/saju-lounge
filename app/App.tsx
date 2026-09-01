@@ -858,7 +858,7 @@ function Header(props: { view: View; hasProfile: boolean; installAvailable: bool
   return (
     <header className="site-header">
       <button className="brand" type="button" onClick={props.onHome} aria-label="사주살롱 홈">
-        <span className="brand-mark">ㅅ</span>
+        <span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span>
         <span className="brand-copy">
           <strong>사주살롱</strong>
           <small>SAJU LOUNGE</small>
