@@ -6,7 +6,8 @@ import { getTojeongContent, type TojeongContent } from "../src/tojeong-content.t
 import { solarToLunar } from "../src/manse.ts";
 import type { CalendarType, Gender, PillarKey, SajuInput, SajuResult } from "../src/types.ts";
 
-type View = "home" | "saju" | "daily" | "compatibility" | "zodiac" | "tojeong";
+type View = "home" | "my" | "profile" | "saju" | "daily" | "compatibility" | "zodiac" | "tojeong";
+type ServiceView = Exclude<View, "home" | "my" | "profile">;
 
 type BirthProfile = {
   year: string;
@@ -24,7 +25,7 @@ type BirthProfile = {
 type BirthProfileUpdate = Partial<BirthProfile>;
 
 type ServiceCard = {
-  id: Exclude<View, "home">;
+  id: ServiceView;
   icon: string;
   label: string;
   title: string;
@@ -271,6 +272,17 @@ function profileLabel(profile: BirthProfile): string {
 
 function resultDateLabel(result: SajuResult): string {
   return `${result.solar.year}.${String(result.solar.month).padStart(2, "0")}.${String(result.solar.day).padStart(2, "0")}`;
+}
+
+function todayKstDate(): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -854,7 +866,7 @@ function InstallBanner(props: { onInstall: () => void; onDismiss: () => void }) 
   );
 }
 
-function Header(props: { view: View; hasProfile: boolean; installAvailable: boolean; onHome: () => void; onSaved: () => void; onInstall: () => void }) {
+function Header(props: { view: View; hasProfile: boolean; installAvailable: boolean; onHome: () => void; onMyHome: () => void; onInstall: () => void }) {
   return (
     <header className="site-header">
       <button className="brand" type="button" onClick={props.onHome} aria-label="사주살롱 홈">
@@ -866,14 +878,114 @@ function Header(props: { view: View; hasProfile: boolean; installAvailable: bool
       </button>
       <nav className="header-nav" aria-label="주요 메뉴">
         <button className={props.view === "home" ? "active" : ""} type="button" onClick={props.onHome}>홈</button>
-        <button className={props.hasProfile && props.view === "saju" ? "active" : ""} type="button" onClick={props.onSaved} disabled={!props.hasProfile}>내 결과</button>
+        <button className={props.hasProfile && props.view === "my" ? "active" : ""} type="button" onClick={props.onMyHome} disabled={!props.hasProfile}>내 운세</button>
       </nav>
       {props.installAvailable ? <button className="install-button" type="button" onClick={props.onInstall}>앱 설치</button> : null}
-      <button className="header-cta" type="button" onClick={props.hasProfile ? props.onSaved : props.onHome}>
-        {props.hasProfile ? "내 사주" : "시작하기"}
+      <button className="header-cta" type="button" onClick={props.hasProfile ? props.onMyHome : props.onHome}>
+        {props.hasProfile ? "내 운세" : "시작하기"}
       </button>
     </header>
   );
+}
+
+function MyHomeView(props: { profile: BirthProfile; result: SajuResult; onSelect: (view: ServiceView) => void; onEdit: () => void }) {
+  const dailyReading = buildDailyReading(props.result, todayKstDate());
+  const tojeongReading = buildTojeongReading(props.result);
+  const strengthLabel = props.result.advanced.dayStrength.strength === "strong" ? "강한 편" : props.result.advanced.dayStrength.strength === "weak" ? "섬세한 편" : "균형형";
+  const currentDaeun = props.result.daeun.current;
+
+  return (
+    <div className="my-page">
+      <section className="my-hero">
+        <div className="my-hero-copy">
+          <p className="eyebrow">MY RHYTHM</p>
+          <h1>다시 만난 <em>나의 리듬</em></h1>
+          <p>{profileLabel(props.profile)} · 내 기기에 저장된 프로필을 기준으로 오늘의 흐름을 정리했어요.</p>
+          <div className="hero-actions">
+            <button className="primary-button" type="button" onClick={() => props.onSelect("saju")}>사주 전체 보기 <span aria-hidden="true">→</span></button>
+            <button className="secondary-button" type="button" onClick={props.onEdit}>출생정보 수정</button>
+          </div>
+        </div>
+        <div className="my-hero-orb" aria-label={`나의 일주 ${props.result.pillars.day}`}>
+          <span>{props.result.pillars.day}</span>
+          <small>나의 일주</small>
+          <i aria-hidden="true" />
+        </div>
+      </section>
+
+      <section className="my-profile-strip">
+        <div>
+          <p className="eyebrow">SAVED ON THIS DEVICE</p>
+          <strong>{profileLabel(props.profile)}</strong>
+          <span>회원가입 없이 이 브라우저에만 저장됩니다.</span>
+        </div>
+        <button className="text-button" type="button" onClick={props.onEdit}>정보 바꾸기 <span aria-hidden="true">→</span></button>
+      </section>
+
+      <section className="section-block my-flow-section">
+        <div className="section-heading">
+          <div><p className="eyebrow">TODAY AT A GLANCE</p><h2>오늘 내 흐름</h2></div>
+          <p>저장된 프로필로<br className="desktop-break" /> 바로 이어서 확인해보세요.</p>
+        </div>
+        <div className="my-flow-grid">
+          <article className="my-flow-card daily-flow">
+            <div className="my-flow-card-top"><span>오늘의 운세</span><strong>{dailyReading.score}<small>점</small></strong></div>
+            <h3>{dailyReading.title}</h3>
+            <p>{dailyReading.keyword} · {dailyReading.cards[0]?.title}</p>
+            <button className="text-button" type="button" onClick={() => props.onSelect("daily")}>오늘 흐름 펼치기 <span aria-hidden="true">→</span></button>
+          </article>
+          <article className="my-flow-card tojeong-flow">
+            <div className="my-flow-card-top"><span>{tojeongReading.year} 토정비결</span><strong>{tojeongReading.guaCode}</strong></div>
+            <h3>{tojeongReading.title}</h3>
+            <p>{tojeongReading.keywords.slice(0, 2).join(" · ")} · 올해의 큰 흐름</p>
+            <button className="text-button" type="button" onClick={() => props.onSelect("tojeong")}>연간 흐름 보기 <span aria-hidden="true">→</span></button>
+          </article>
+          <article className="my-flow-card saju-flow">
+            <div className="my-flow-card-top"><span>나의 사주 기준</span><strong>{props.result.pillars.day}</strong></div>
+            <h3>{strengthLabel} · {leadingElement(props.result)} 기운</h3>
+            <p>{currentDaeun ? `${props.result.currentAge}세 · ${currentDaeun.ganzhi} 대운` : "나의 네 기둥과 오행 흐름"}</p>
+            <button className="text-button" type="button" onClick={() => props.onSelect("saju")}>상세 분석 보기 <span aria-hidden="true">→</span></button>
+          </article>
+        </div>
+      </section>
+
+      <section className="section-block my-services-section">
+        <div className="section-heading">
+          <div><p className="eyebrow">YOUR LOUNGE</p><h2>다음으로 살펴볼 서비스</h2></div>
+          <p>필요한 순간에<br className="desktop-break" /> 가볍게 골라보세요.</p>
+        </div>
+        <div className="my-service-grid">
+          {SERVICES.map((service) => (
+            <button className={`my-service-card ${service.tone}`} type="button" key={service.id} onClick={() => props.onSelect(service.id)}>
+              <span className="service-icon">{service.icon}</span>
+              <div><p className="service-label">{service.label}</p><h3>{service.title}</h3><p>{service.description}</p></div>
+              <span className="service-arrow" aria-hidden="true">↗</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <p className="my-privacy-note"><span aria-hidden="true">✦</span> 프로필은 이 브라우저의 로컬 저장소에만 보관됩니다. 다른 기기나 서버로 전송하지 않습니다.</p>
+    </div>
+  );
+}
+
+function ProfileEditorScreen(props: { initialProfile: BirthProfile; onSaved: (profile: BirthProfile, result: SajuResult) => void; onDone: () => void; onBack: () => void }) {
+  const [profile, setProfile] = useState<BirthProfile>({ ...props.initialProfile });
+  const [error, setError] = useState("");
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const result = calculateProfile(profile);
+      props.onSaved(profile, result);
+      props.onDone();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "출생정보를 확인해주세요.");
+    }
+  }
+
+  return <div className="page-shell"><PageIntro eyebrow="YOUR PROFILE" title="출생정보 수정" description="저장된 정보를 바꾸면 사주살롱의 모든 서비스에 함께 적용됩니다." onBack={props.onBack} /><ProfileForm profile={profile} onChange={(next) => setProfile((current) => ({ ...current, ...next }))} onSubmit={handleSubmit} title="나의 정보를 업데이트해주세요" description="이 브라우저에만 저장되며, 회원가입은 필요하지 않습니다." submitLabel="저장하고 내 운세 보기" error={error} idPrefix="profile" /></div>;
 }
 
 function HomeView(props: { hasProfile: boolean; result: SajuResult | null; onSelect: (view: Exclude<View, "home">) => void }) {
@@ -885,8 +997,8 @@ function HomeView(props: { hasProfile: boolean; result: SajuResult | null; onSel
           <h1>오늘의 나를,<br /><em>조금 더 깊이</em> 읽는 시간</h1>
           <p className="hero-description">사주부터 별자리까지. 복잡한 운세를 쉽고 따뜻한 언어로 만나보세요.</p>
           <div className="hero-actions">
-            <button className="primary-button" type="button" onClick={() => props.onSelect("saju")}>
-              {props.hasProfile ? "내 사주 다시 보기" : "무료로 시작하기"} <span aria-hidden="true">→</span>
+            <button className="primary-button" type="button" onClick={() => props.onSelect(props.hasProfile ? "my" : "saju")}>
+              {props.hasProfile ? "내 운세 홈 열기" : "무료로 시작하기"} <span aria-hidden="true">→</span>
             </button>
             <span className="hero-note"><i /> 회원가입 없이 바로 이용</span>
           </div>
@@ -929,7 +1041,7 @@ function HomeView(props: { hasProfile: boolean; result: SajuResult | null; onSel
               <h2>당신의 지도를 다시 펼쳐볼까요?</h2>
               <p>{resultDateLabel(props.result)} · {props.result.pillars.day} 일주 · {props.result.advanced.geukguk}</p>
             </div>
-            <button className="text-button" type="button" onClick={() => props.onSelect("saju")}>결과 보기 <span aria-hidden="true">→</span></button>
+            <button className="text-button" type="button" onClick={() => props.onSelect("my")}>내 운세 홈 열기 <span aria-hidden="true">→</span></button>
           </div>
         </section>
       ) : null}
@@ -1377,13 +1489,18 @@ export function App() {
     saveStoredProfile(profile);
   }
 
+  const hasSavedProfile = Boolean(savedProfile && savedResult);
+  const backView: View = hasSavedProfile ? "my" : "home";
   let content: ReactNode;
-  if (view === "home") content = <HomeView hasProfile={Boolean(savedProfile && savedResult)} result={savedResult} onSelect={(nextView) => openView(nextView)} />;
-  if (view === "saju") content = <SajuScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
-  if (view === "daily") content = <DailyScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
-  if (view === "tojeong") content = <TojeongScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
-  if (view === "compatibility") content = <CompatibilityScreen initialProfile={savedProfile} onSaved={handleSaved} onBack={() => openView("home")} />;
-  if (view === "zodiac") content = <ZodiacScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
+  if (view === "home") content = <HomeView hasProfile={hasSavedProfile} result={savedResult} onSelect={(nextView) => openView(nextView)} />;
+  if (view === "my" && savedProfile && savedResult) content = <MyHomeView profile={savedProfile} result={savedResult} onSelect={(nextView) => openView(nextView)} onEdit={() => openView("profile")} />;
+  if (view === "profile" && savedProfile) content = <ProfileEditorScreen initialProfile={savedProfile} onSaved={handleSaved} onDone={() => openView("my")} onBack={() => openView("my")} />;
+  if (view === "saju") content = <SajuScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView(backView)} />;
+  if (view === "daily") content = <DailyScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView(backView)} />;
+  if (view === "tojeong") content = <TojeongScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView(backView)} />;
+  if (view === "compatibility") content = <CompatibilityScreen initialProfile={savedProfile} onSaved={handleSaved} onBack={() => openView(backView)} />;
+  if (view === "zodiac") content = <ZodiacScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView(backView)} />;
+  if (!content) content = <HomeView hasProfile={hasSavedProfile} result={savedResult} onSelect={(nextView) => openView(nextView)} />;
 
-  return <div className="app"><Header view={view} hasProfile={Boolean(savedProfile && savedResult)} installAvailable={Boolean(installPrompt)} onHome={() => openView("home")} onSaved={() => openView("saju")} onInstall={handleInstall} /><main>{content}</main>{installPrompt && installBannerVisible ? <InstallBanner onInstall={handleInstall} onDismiss={() => setInstallBannerVisible(false)} /> : null}<Footer /></div>;
+  return <div className="app"><Header view={view} hasProfile={hasSavedProfile} installAvailable={Boolean(installPrompt)} onHome={() => openView("home")} onMyHome={() => openView("my")} onInstall={handleInstall} /><main>{content}</main>{installPrompt && installBannerVisible ? <InstallBanner onInstall={handleInstall} onDismiss={() => setInstallBannerVisible(false)} /> : null}<Footer /></div>;
 }
