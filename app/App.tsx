@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { calculateSaju } from "../src/calculate.ts";
 import type { CalendarType, Gender, PillarKey, SajuInput, SajuResult } from "../src/types.ts";
 
-type View = "home" | "saju" | "daily" | "compatibility" | "zodiac";
+type View = "home" | "saju" | "daily" | "compatibility" | "zodiac" | "tojeong";
 
 type BirthProfile = {
   year: string;
@@ -48,6 +48,17 @@ type CompatibilityReading = {
   caution: string;
 };
 
+type TojeongReading = {
+  year: number;
+  score: number;
+  title: string;
+  summary: string;
+  keywords: string[];
+  themes: Array<{ label: string; title: string; body: string; tone: string }>;
+  months: Array<{ month: number; name: string; phase: string; body: string; score: number }>;
+  caution: string;
+};
+
 const PROFILE_STORAGE_KEY = "saju-lounge-profile-v1";
 type TopicReading = {
   id: string;
@@ -80,6 +91,15 @@ const SERVICES: ServiceCard[] = [
     description: "오늘의 흐름을 가볍게 확인하고 하루의 방향을 잡아보세요.",
     tone: "gold",
     detail: "사주 기반",
+  },
+  {
+    id: "tojeong",
+    icon: "年",
+    label: "YEARLY GUIDE",
+    title: "토정비결",
+    description: "한 해의 큰 흐름과 달마다 달라지는 리듬을 살펴보세요.",
+    tone: "gold",
+    detail: "올해의 흐름",
   },
   {
     id: "compatibility",
@@ -307,6 +327,62 @@ function buildDailyReading(result: SajuResult, date: string): DailyReading {
         body: "화면에서 눈을 떼고 물을 마시는 짧은 휴식만으로도 생각의 결이 달라질 수 있습니다.",
       },
     ],
+  };
+}
+
+function buildTojeongReading(result: SajuResult): TojeongReading {
+  const year = result.currentYear;
+  const element = leadingElement(result);
+  const seed = result.input.year + result.input.month * 7 + result.input.day * 13 + result.pillarDetails.day.stemIdx * 17 + result.pillarDetails.day.branchIdx * 5 + year;
+  const score = clamp(67 + (seed % 25), 58, 94);
+  const title = score >= 84 ? "움직인 만큼 길이 열리는 한 해" : score >= 74 ? "차분한 준비가 기회를 부르는 한 해" : "속도를 조절하며 내실을 다지는 한 해";
+  const months = result.wolun.map((item) => {
+    const monthScore = clamp(61 + ((seed + item.month * 11) % 31), 55, 94);
+    const phase = monthScore >= 82 ? "확장" : monthScore >= 70 ? "전환" : "정리";
+    const name = item.monthName || item.month_name || `${item.month}월`;
+    return {
+      month: item.month,
+      name,
+      phase,
+      score: monthScore,
+      body: `${item.ganzhi}의 기운이 만나는 달입니다. ${phase === "확장" ? "사람과 기회를 넓혀보세요." : phase === "전환" ? "하던 방식을 조금 바꿔보세요." : "속도를 늦추고 기반을 다져보세요."}`,
+    };
+  });
+
+  return {
+    year,
+    score,
+    title,
+    summary: `${year}년은 ${element} 기운의 장점을 생활 속 선택으로 옮길수록 흐름이 선명해지는 해예요. 한 번에 크게 바꾸기보다 계절마다 한 가지씩 방향을 조정해보세요.`,
+    keywords: score >= 84 ? ["확장", "표현", "기회"] : score >= 74 ? ["준비", "연결", "균형"] : ["정리", "회복", "기초"],
+    themes: [
+      {
+        label: "큰 흐름",
+        title: score >= 78 ? "작은 움직임이 다음 문을 엽니다" : "비워낸 자리에 새 흐름이 들어옵니다",
+        body: "올해는 결과를 서둘러 확정하기보다, 계속 이어갈 수 있는 방향을 고르는 일이 중요해요.",
+        tone: "plum",
+      },
+      {
+        label: "재물 운",
+        title: "관리하는 습관이 가장 오래 남아요",
+        body: "수입과 지출을 한눈에 보는 간단한 기준을 만들면 좋은 기회를 알아보는 감각도 함께 자랍니다.",
+        tone: "gold",
+      },
+      {
+        label: "일과 관계",
+        title: "혼자보다 함께할 때 속도가 맞춰져요",
+        body: "나의 역할을 분명히 말하고 상대의 속도도 존중하면 일과 관계의 피로가 한결 가벼워집니다.",
+        tone: "rose",
+      },
+      {
+        label: "올해의 실천",
+        title: "계절마다 한 가지씩 정리하기",
+        body: "해야 할 일을 늘리기보다 지금의 생활에서 덜어낼 한 가지를 정하면 운의 방향이 선명해져요.",
+        tone: "blue",
+      },
+    ],
+    months,
+    caution: "토정비결은 전통 운세 형식을 바탕으로 만든 자기이해용 참고 콘텐츠이며, 중요한 결정을 대신하지 않습니다.",
   };
 }
 
@@ -764,6 +840,68 @@ function DailyScreen(props: { initialProfile: BirthProfile | null; initialResult
   return <div className="result-page"><div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><button className="secondary-button" type="button" onClick={() => setEditing(true)}>프로필 수정</button></div><section className="daily-hero"><div><p className="eyebrow">DAILY RHYTHM · {date.replaceAll("-", ".")}</p><h1>{reading.title}</h1><p>{reading.summary}</p></div><div className="daily-score"><span>오늘의 흐름</span><strong>{reading.score}</strong><small>/ 100</small></div></section><div className="daily-controls"><label><span>다른 날짜 보기</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><span className="keyword-chip">KEYWORD · {reading.keyword}</span></div><section className="daily-cards">{reading.cards.map((card) => <article className="daily-card" key={card.label}><span>{card.label}</span><h2>{card.title}</h2><p>{card.body}</p></article>)}</section><section className="daily-reflection"><p className="eyebrow">A SMALL QUESTION</p><h2>오늘 내가 선택할 수 있는<br /><em>가장 작은 변화는 무엇일까요?</em></h2><p>운세를 정답처럼 맞히기보다, 하루를 조금 더 다정하게 설계하는 질문으로 사용해보세요.</p></section><p className="disclaimer">오늘의 운세는 사주 데이터를 바탕으로 만든 참고용 콘텐츠입니다.</p></div>;
 }
 
+function TojeongResultView(props: { result: SajuResult; profile: BirthProfile; reading: TojeongReading; onEdit: () => void; onBack: () => void }) {
+  const [shareStatus, setShareStatus] = useState("");
+  const shareText = `사주살롱 토정비결\n${props.reading.year}년 · ${props.reading.title}\n${props.reading.summary}`;
+
+  async function handleShare() {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "사주살롱 토정비결", text: shareText });
+      } else {
+        await copyText(shareText);
+      }
+      setShareStatus("토정비결을 공유할 준비가 되었습니다.");
+    } catch {
+      setShareStatus("공유를 취소했거나 브라우저가 지원하지 않습니다.");
+    }
+  }
+
+  return (
+    <div className="result-page">
+      <div className="result-topbar"><button className="back-link" type="button" onClick={props.onBack}><span aria-hidden="true">←</span> 서비스 목록</button><div className="result-actions"><button className="secondary-button" type="button" onClick={props.onEdit}>프로필 수정</button><button className="primary-button small-button" type="button" onClick={handleShare}>결과 공유</button></div></div>
+      {shareStatus ? <p className="share-status" role="status">{shareStatus}</p> : null}
+      <section className="tojeong-hero">
+        <div><p className="eyebrow">YEARLY GUIDE · {props.reading.year}</p><h1>{props.reading.title}</h1><p>{profileLabel(props.profile)} · 한 해의 큰 흐름을 살펴보세요.</p></div>
+        <div className="tojeong-score"><span>올해의 흐름</span><strong>{props.reading.score}</strong><small>점</small></div>
+      </section>
+      <section className="tojeong-overview">
+        <div><p className="eyebrow">TOJEONG BIG PICTURE</p><h2>{props.reading.year}년, 나의 흐름을 읽는 법</h2><p>{props.reading.summary}</p></div>
+        <div className="tojeong-keywords">{props.reading.keywords.map((keyword) => <span key={keyword}>#{keyword}</span>)}</div>
+      </section>
+      <section className="content-section"><SectionTitle eyebrow="YEARLY THEMES" title="올해의 네 가지 장면" /><div className="tojeong-theme-grid">{props.reading.themes.map((theme) => <article className={`tojeong-theme ${theme.tone}`} key={theme.label}><span>{theme.label}</span><h3>{theme.title}</h3><p>{theme.body}</p></article>)}</div></section>
+      <section className="content-section"><SectionTitle eyebrow="MONTH BY MONTH" title="달마다 달라지는 흐름" /><div className="tojeong-month-grid">{props.reading.months.map((month) => <article className="tojeong-month" key={month.month}><div className="tojeong-month-top"><span>{month.name}</span><strong>{month.score}</strong></div><div className="tojeong-month-track"><i style={{ width: `${month.score}%` }} /></div><b>{month.phase}</b><p>{month.body}</p></article>)}</div></section>
+      <p className="disclaimer">{props.reading.caution}</p>
+    </div>
+  );
+}
+
+function TojeongScreen(props: { initialProfile: BirthProfile | null; initialResult: SajuResult | null; onSaved: (profile: BirthProfile, result: SajuResult) => void; onBack: () => void }) {
+  const [profile, setProfile] = useState<BirthProfile>(props.initialProfile ? { ...props.initialProfile } : createEmptyProfile());
+  const [result, setResult] = useState<SajuResult | null>(props.initialResult);
+  const [error, setError] = useState("");
+  const [editing, setEditing] = useState(!props.initialResult);
+  const reading = useMemo(() => (result ? buildTojeongReading(result) : null), [result]);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const nextResult = calculateProfile(profile);
+      setResult(nextResult);
+      setError("");
+      setEditing(false);
+      props.onSaved(profile, nextResult);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "입력값을 확인해주세요.");
+    }
+  }
+
+  if (!editing && result && reading) return <TojeongResultView result={result} profile={profile} reading={reading} onEdit={() => setEditing(true)} onBack={props.onBack} />;
+
+  return <div className="page-shell"><PageIntro eyebrow="YEARLY GUIDE" title="토정비결" description="한 해의 큰 흐름과 달마다 달라지는 리듬을 차분히 살펴봅니다." onBack={props.onBack} /><ProfileForm profile={profile} onChange={(next) => setProfile((current) => ({ ...current, ...next }))} onSubmit={handleSubmit} title="올해의 흐름을 위한 정보" description="사주 분석에 사용한 출생정보를 바탕으로 토정비결을 안내합니다." submitLabel="토정비결 보기" error={error} idPrefix="tojeong" /></div>;
+}
+
 function CompatibilityResultView(props: { first: BirthProfile; second: BirthProfile; firstResult: SajuResult; secondResult: SajuResult; reading: CompatibilityReading; onEdit: () => void; onBack: () => void }) {
   const [shareStatus, setShareStatus] = useState("");
   async function handleShare() {
@@ -878,6 +1016,7 @@ export function App() {
   if (view === "home") content = <HomeView hasProfile={Boolean(savedProfile && savedResult)} result={savedResult} onSelect={(nextView) => openView(nextView)} />;
   if (view === "saju") content = <SajuScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
   if (view === "daily") content = <DailyScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
+  if (view === "tojeong") content = <TojeongScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
   if (view === "compatibility") content = <CompatibilityScreen initialProfile={savedProfile} onSaved={handleSaved} onBack={() => openView("home")} />;
   if (view === "zodiac") content = <ZodiacScreen initialProfile={savedProfile} initialResult={savedResult} onSaved={handleSaved} onBack={() => openView("home")} />;
 
